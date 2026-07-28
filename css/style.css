@@ -1,0 +1,303 @@
+/* ============================================================
+   扫雷 · 经典 Windows 风格样式
+   契约要点：
+   - #board 使用 CSS Grid，单元格尺寸由 --cell-size 控制，
+     列模板由 game.js 通过 style.gridTemplateColumns 设置
+   - 单元格 class 组合：.cell / .revealed / .mine / .flagged /
+     .exploded / .wrong-flag / .n1~.n8
+   - @keyframes shake + .shake（effects.js 作用于 #board-wrap）
+   - #fx-canvas 绝对覆盖 #board-wrap，pointer-events: none
+   ============================================================ */
+
+/* ---------- 全局变量与基础 ---------- */
+:root {
+  --cell-size: 32px;          /* 单元格边长，JS 可按难度覆盖 */
+  --panel-bg: #c0c0c0;        /* 经典 Windows 浅灰面板 */
+  --bevel-light: #ffffff;     /* 斜面高光（上/左） */
+  --bevel-dark: #808080;      /* 斜面阴影（下/右） */
+  --page-bg: #e8e6e1;         /* 柔和中性页面背景 */
+  --digital-red: #ff2d2d;     /* 数码管红 */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 12px;
+  background: var(--page-bg);
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  /* 棋盘内防止拖选文字 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ---------- 应用面板：现代圆角 + 轻微阴影，内衬经典灰 ---------- */
+#app {
+  background: var(--panel-bg);
+  border: 3px solid;
+  border-color: var(--bevel-light) var(--bevel-dark)
+                var(--bevel-dark) var(--bevel-light);
+  border-radius: 10px;          /* 现代细节：圆角 */
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22),
+              0 2px 6px rgba(0, 0, 0, 0.12);
+  padding: 12px;
+  max-width: calc(100vw - 24px);
+}
+
+/* ---------- 设置栏：紧凑排列在顶部 ---------- */
+#settings-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 10px;
+  background: var(--panel-bg);
+  border: 2px solid;
+  border-color: var(--bevel-dark) var(--bevel-light)
+                var(--bevel-light) var(--bevel-dark); /* 凹陷 */
+  border-radius: 6px;
+  font-size: 13px;
+  color: #222;
+}
+
+#preset-select {
+  font-size: 13px;
+  padding: 3px 6px;
+  background: #fff;
+  border: 2px solid;
+  border-color: var(--bevel-dark) var(--bevel-light)
+                var(--bevel-light) var(--bevel-dark);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+#custom-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#custom-inputs[hidden] {
+  display: none;
+}
+
+#custom-inputs label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+#custom-inputs input[type="number"] {
+  width: 52px;
+  padding: 2px 4px;
+  font-size: 13px;
+  border: 2px solid;
+  border-color: var(--bevel-dark) var(--bevel-light)
+                var(--bevel-light) var(--bevel-dark);
+  border-radius: 3px;
+}
+
+#apply-btn {
+  padding: 3px 10px;
+  font-size: 13px;
+  background: var(--panel-bg);
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-dark)
+                var(--bevel-dark) var(--bevel-light);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+#apply-btn:active {
+  border-color: var(--bevel-dark) var(--bevel-light)
+                var(--bevel-light) var(--bevel-dark);
+}
+
+#sound-label {
+  margin-left: auto;          /* 音效开关靠右 */
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---------- 状态栏：数码管 + 笑脸 ---------- */
+#status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border: 2px solid;
+  border-color: var(--bevel-dark) var(--bevel-light)
+                var(--bevel-light) var(--bevel-dark); /* 凹陷 */
+  border-radius: 6px;
+}
+
+/* 经典红色数码管：黑底红字等宽字体 */
+.digital {
+  background: #000;
+  color: var(--digital-red);
+  font-family: "Courier New", Consolas, monospace;
+  font-size: 26px;
+  font-weight: bold;
+  line-height: 1;
+  letter-spacing: 2px;
+  padding: 3px 6px;
+  min-width: 3ch;
+  text-align: center;
+  border: 2px solid;
+  border-color: var(--bevel-dark) var(--bevel-light)
+                var(--bevel-light) var(--bevel-dark);
+  border-radius: 3px;
+  text-shadow: 0 0 6px rgba(255, 45, 45, 0.55);
+}
+
+/* 笑脸按钮：大 emoji 居中，经典凸起 */
+#face-btn {
+  width: 46px;
+  height: 46px;
+  font-size: 26px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-bg);
+  border: 3px solid;
+  border-color: var(--bevel-light) var(--bevel-dark)
+                var(--bevel-dark) var(--bevel-light);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+}
+
+#face-btn:active {
+  border-color: var(--bevel-dark) var(--bevel-light)
+                var(--bevel-light) var(--bevel-dark);
+}
+
+/* ---------- 操作提示小字 ---------- */
+#hint {
+  font-size: 11px;
+  color: #555;
+  text-align: center;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+/* ---------- 棋盘容器：特效画布的定位基准 ---------- */
+#board-wrap {
+  position: relative;
+  display: inline-block;        /* 宽度跟随棋盘 */
+  line-height: 0;               /* 消除 inline 间隙 */
+  border: 3px solid;
+  border-color: var(--bevel-dark) var(--bevel-light)
+                var(--bevel-light) var(--bevel-dark); /* 凹陷 */
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* 震屏：effects.js 给 #board-wrap 添加/移除 .shake */
+.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  10%      { transform: translate(-6px, 2px); }
+  20%      { transform: translate(5px, -3px); }
+  30%      { transform: translate(-5px, -2px); }
+  40%      { transform: translate(4px, 3px); }
+  50%      { transform: translate(-4px, 1px); }
+  60%      { transform: translate(3px, -2px); }
+  70%      { transform: translate(-2px, 2px); }
+  80%      { transform: translate(2px, -1px); }
+  90%      { transform: translate(-1px, 1px); }
+}
+
+/* ---------- 棋盘：CSS Grid，列模板由 game.js 设置 ---------- */
+#board {
+  display: grid;
+  gap: 0;
+  background: var(--panel-bg);
+}
+
+/* ---------- 单元格：经典凸起斜面 ---------- */
+.cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Courier New", Consolas, monospace;
+  font-weight: bold;
+  font-size: calc(var(--cell-size) * 0.56);
+  line-height: 1;
+  cursor: pointer;
+  background: var(--panel-bg);
+  /* 凸起：上左浅、下右深 */
+  border: 3px solid;
+  border-color: var(--bevel-light) var(--bevel-dark)
+                var(--bevel-dark) var(--bevel-light);
+}
+
+/* 翻开：凹陷平面 */
+.cell.revealed {
+  background: #bdbdbd;
+  border: 1px solid #8f8f8f;
+  cursor: default;
+}
+
+/* 插旗（🚩 由 game.js 写入文本） */
+.cell.flagged {
+  /* 保持未翻开凸起外观，仅标记语义 */
+}
+
+/* 踩中的雷：红底 */
+.cell.exploded {
+  background: #ff0000;
+  border: 1px solid #8f8f8f;
+}
+
+/* 普通雷（失败后翻开） */
+.cell.mine {
+  background: #bdbdbd;
+  border: 1px solid #8f8f8f;
+}
+
+/* 错误旗标：叉掉的红叉底纹 */
+.cell.wrong-flag {
+  background: #bdbdbd;
+  border: 1px solid #8f8f8f;
+  color: #c00000;
+}
+
+/* ---------- 数字经典配色（classic Windows） ---------- */
+.n1 { color: #0000ff; }  /* 1 蓝   */
+.n2 { color: #008000; }  /* 2 绿   */
+.n3 { color: #ff0000; }  /* 3 红   */
+.n4 { color: #000080; }  /* 4 深蓝 */
+.n5 { color: #800000; }  /* 5 暗红 */
+.n6 { color: #008080; }  /* 6 青   */
+.n7 { color: #000000; }  /* 7 黑   */
+.n8 { color: #808080; }  /* 8 灰   */
+
+/* ---------- 特效画布：绝对覆盖在棋盘之上 ---------- */
+#fx-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>扫雷</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- ============ 应用根容器（契约要求 id="app"） ============ -->
+  <div id="app">
+
+    <!-- ============ 设置栏：难度选择 / 自定义参数 / 音效开关 ============ -->
+    <header id="settings-bar">
+      <select id="preset-select">
+        <option value="beginner">初级 9×9 · 10 雷</option>
+        <option value="intermediate">中级 16×16 · 40 雷</option>
+        <option value="expert">高级 30×16 · 99 雷</option>
+        <option value="custom">自定义</option>
+      </select>
+
+      <!-- 自定义参数区：仅在 preset-select 选 custom 时显示 -->
+      <div id="custom-inputs" hidden>
+        <label>宽 <input id="custom-width" type="number" min="5" max="50" value="16"></label>
+        <label>高 <input id="custom-height" type="number" min="5" max="30" value="16"></label>
+        <label>雷 <input id="custom-mines" type="number" min="1" max="999" value="40"></label>
+        <button id="apply-btn">开始游戏</button>
+      </div>
+
+      <label id="sound-label"><input type="checkbox" id="sound-toggle" checked> 音效</label>
+    </header>
+
+    <!-- ============ 状态栏：剩余雷数 / 笑脸 / 计时器 ============ -->
+    <div id="status-bar">
+      <div id="mine-counter" class="digital">010</div>
+      <button id="face-btn">🙂</button>
+      <div id="timer" class="digital">000</div>
+    </div>
+
+    <!-- 操作提示小字 -->
+    <p id="hint">左键翻开 · 右键插旗 · 数字格双击快速翻开</p>
+
+    <!-- ============ 棋盘区：棋盘 + 特效画布叠层 ============ -->
+    <div id="board-wrap">
+      <div id="board"></div>
+      <canvas id="fx-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- 脚本加载顺序（契约）：audio → effects → game -->
+  <script src="js/audio.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
