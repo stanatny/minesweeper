@@ -34,10 +34,12 @@ jobs:
       - name: Package app
         run: |
           ditto -c -k --sequesterRsrc --keepParent \
-            "扫雷.app" "扫雷-macOS-v1.0.0.zip"
-          shasum -a 256 "扫雷-macOS-v1.0.0.zip"
+            "扫雷.app" "Minesweeper-macOS-v1.0.0.zip"
+          shasum -a 256 "Minesweeper-macOS-v1.0.0.zip"
 
       - name: Upload release asset
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload v1.0.0 "扫雷-macOS-v1.0.0.zip" --clobber
+        run: |
+          gh release delete-asset v1.0.0 "-macOS-v1.0.0.zip" --yes || true
+          gh release upload v1.0.0 "Minesweeper-macOS-v1.0.0.zip" --clobber
