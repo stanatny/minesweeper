@@ -29,7 +29,7 @@ jobs:
         run: |
           codesign --verify --deep --strict --verbose=2 "扫雷.app"
           file "扫雷.app/Contents/MacOS/扫雷"
-          lipo -verify_arch arm64 x86_64 "扫雷.app/Contents/MacOS/扫雷"
+          lipo "扫雷.app/Contents/MacOS/扫雷" -verify_arch arm64 x86_64
 
       - name: Package app
         run: |
