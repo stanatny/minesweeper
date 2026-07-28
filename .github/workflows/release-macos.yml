@@ -1,0 +1,43 @@
+name: Build macOS release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/release-macos.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload:
+    runs-on: macos-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build universal macOS app
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Verify app bundle
+        run: |
+          codesign --verify --deep --strict --verbose=2 "扫雷.app"
+          file "扫雷.app/Contents/MacOS/扫雷"
+          lipo -verify_arch arm64 x86_64 "扫雷.app/Contents/MacOS/扫雷"
+
+      - name: Package app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "扫雷.app" "扫雷-macOS-v1.0.0.zip"
+          shasum -a 256 "扫雷-macOS-v1.0.0.zip"
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload v1.0.0 "扫雷-macOS-v1.0.0.zip" --clobber
