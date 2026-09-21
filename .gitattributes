@@ -1,3 +1,3 @@
-# 构建产物由源码生成；保留上游着色器字符串中的原始空白。
+# Build artifacts are generated from source; preserve original whitespace in upstream shader strings.
 dist/** linguist-generated=true
 dist/explorer.js -whitespace

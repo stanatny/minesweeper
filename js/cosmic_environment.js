@@ -1,9 +1,9 @@
-// createCosmicEnvironment 创建全部由程序生成的远景，不依赖图片或额外渲染通道。
-// 参数：THREE 为宿主使用的 Three.js 模块；返回场景组、逐帧更新及资源释放方法。
+// createCosmicEnvironment builds a procedural backdrop without image assets or additional render passes.
+// Accepts the host Three.js module and returns a scene group, a frame update method, and a disposal method.
 export function createCosmicEnvironment(THREE) {
   const group = new THREE.Group();
   group.name = "cosmic_environment";
-  // 沿默认相机的左上方布景；压低世界坐标以避开大尺寸棋盘，同时保留可见的半球轮廓。
+  // Place the planet at the upper left of the default view, lowering it in world space to clear large boards while retaining its silhouette.
   const planetPosition = new THREE.Vector3(-20, -12, -19);
   const planetGeometry = new THREE.SphereGeometry(6.1, 64, 32);
   const planetMaterial = new THREE.ShaderMaterial({
@@ -67,7 +67,7 @@ export function createCosmicEnvironment(THREE) {
   planet.rotation.set(0.18, 0.45, -0.25);
   group.add(planet);
 
-  // 共用球面几何，仅额外渲染一次大气；柔和边缘不会形成遮挡棋盘的实心光盘。
+  // Reuse the sphere geometry for one atmosphere draw; its soft rim avoids an opaque halo over the board.
   const atmosphereMaterial = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -106,7 +106,7 @@ export function createCosmicEnvironment(THREE) {
   atmosphere.scale.setScalar(0.873);
   group.add(atmosphere);
 
-  // 尘带与星群合并成一次透明绘制；所有点位于棋盘后方，支持正交与透视相机。
+  // Combine dust and stars in one transparent draw behind the board, supporting both orthographic and perspective cameras.
   const random = seededRandom(729401);
   const positions = [];
   const colors = [];
@@ -125,7 +125,7 @@ export function createCosmicEnvironment(THREE) {
       vertical = (random() - 0.5) * 70;
       distance = 34 + random() * 60;
     }
-    // 默认镜头的横纵轴布景，再沿视线后移，避免尘带落到可见范围之外。
+    // Arrange the backdrop along the default camera axes, then move it backward along the view direction to keep the dust in frame.
     positions.push(
       horizontal * 0.85 - vertical * 0.332 - distance * 0.409,
       vertical * 0.777 - distance * 0.629,
@@ -232,7 +232,7 @@ export function createCosmicEnvironment(THREE) {
   let disposed = false;
   return {
     group,
-    // time 使用秒；减少动态效果时保持静止，同时保留完整光照与背景。
+    // time is in seconds; reduced motion freezes movement while preserving the lighting and backdrop.
     update(time, reducedMotion = false) {
       if (disposed) return;
       const seconds = Number.isFinite(time) ? time : 0;
@@ -256,7 +256,7 @@ export function createCosmicEnvironment(THREE) {
   };
 }
 
-// 固定随机种子让重开棋局及截图比较时的远景保持一致。
+// A fixed random seed keeps the backdrop consistent across restarts and screenshot comparisons.
 function seededRandom(seed) {
   return () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;

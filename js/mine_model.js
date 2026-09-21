@@ -1,6 +1,6 @@
-// MineModels 批量绘制已经显现的机械地雷；调用方只传入允许玩家看到的 items。
-// constructor 参数：THREE 为宿主 Three.js 模块，capacity 为最大地雷数量。
-// update 参数：{ id, x, z, y = 0.35, stage, progress } 数组；dispose 释放所有 GPU 资源。
+// MineModels batches visible mechanical mines; callers supply only items the player is allowed to see.
+// constructor accepts the host Three.js module and the maximum mine capacity.
+// update accepts an array of { id, x, z, y = 0.35, stage, progress }; dispose releases all GPU resources.
 export class MineModels {
   constructor(THREE, capacity) {
     if (!Number.isInteger(capacity) || capacity < 1) {
@@ -39,7 +39,7 @@ export class MineModels {
       roughness: 0.93,
     });
 
-    // 四瓣球壳共用同一片曲面；纵向窄缝与极点开口露出独立内核。
+    // Four shell segments share one curved surface; vertical gaps and polar openings reveal the separate core.
     this.parts = {
       armorPetals: this.createInstances(
         "mine_armor_petals",
@@ -100,7 +100,7 @@ export class MineModels {
     };
   }
 
-  // update 一次替换整批实例；不会查询棋盘答案，也不会保留上一轮未提供的地雷。
+  // update replaces the entire instance batch without reading hidden board answers or retaining omitted mines from the previous update.
   update(items) {
     if (this.disposed) return;
     if (!Array.isArray(items))
@@ -224,7 +224,7 @@ export class MineModels {
         this.color.setRGB(heat * 0.8, heat * (primed ? 0.03 : 0.075), 0.005),
       );
 
-      // 六根短接触引信围绕赤道排列，含套环与锥形触头；最大直径不足 0.75。
+      // Six short contact fuses ring the equator, each with a collar and tapered tip; the overall diameter stays below 0.75.
       for (let sensor = 0; sensor < 6; sensor++) {
         const angle = (sensor * Math.PI) / 3 + Math.PI / 6;
         this.direction.set(Math.cos(angle), 0.07, Math.sin(angle)).normalize();
@@ -264,7 +264,7 @@ export class MineModels {
     }
   }
 
-  // dispose 回收实例矩阵、共享材质及几何；允许重复调用。
+  // dispose releases instance matrices, shared materials, and geometry; repeated calls are safe.
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
@@ -279,7 +279,7 @@ export class MineModels {
     this.group.clear();
   }
 
-  // createInstances 将每类零件合并为一次绘制，实例容量只在构造时分配。
+  // createInstances batches each part type into one draw and allocates instance capacity only during construction.
   createInstances(name, geometry, material, capacity) {
     const mesh = new this.THREE.InstancedMesh(geometry, material, capacity);
     mesh.name = name;
@@ -289,7 +289,7 @@ export class MineModels {
     return mesh;
   }
 
-  // place 默认清除上一零件旋转；指定 keepRotation 可复用传感器方向或球壳朝向。
+  // place resets the previous part rotation unless keepRotation preserves a sensor or shell orientation.
   place(mesh, index, x, y, z, sx = 1, sy = 1, sz = 1, keepRotation = false) {
     this.dummy.position.set(x, y, z);
     if (!keepRotation) this.dummy.rotation.set(0, 0, 0);

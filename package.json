@@ -10,7 +10,8 @@
     "test:browser": "node tests/browser_test.js",
     "test:polish": "node tests/polish_regression_test.js",
     "test:timing": "node tests/detonation_timing_browser_test.js",
-    "test:flames": "node tests/flame_effects_browser_test.js"
+    "test:flames": "node tests/flame_effects_browser_test.js",
+    "test:fireworks": "node tests/victory_fireworks_browser_test.js"
   },
   "dependencies": {
     "three": "0.186.0"

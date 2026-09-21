@@ -1,4 +1,4 @@
-/* 静默边界：界面只负责信息与操作，三维遗迹由渲染器绘制。 */
+/* VOID SURVEY: the interface provides information and controls; the renderer draws the 3D relic field. */
 :root {
   color-scheme: dark;
   --space: #070d14;
@@ -87,7 +87,7 @@ h2 {
   background: #335361;
   color: white;
 }
-/* 顶部标识和工具位于场景之外。 */
+/* Keep the brand and header controls outside the scene. */
 .expedition {
   max-width: 1920px;
   min-height: 100svh;
@@ -189,7 +189,7 @@ h2 {
 .sound-button[aria-pressed="true"] .sound-on {
   display: block;
 }
-/* 任务栏用排版与分隔线组织，避免堆叠厚重卡片。 */
+/* Organize the mission rail with typography and dividers. */
 .mission-layout {
   display: grid;
   grid-template-columns: 235px minmax(0, 1fr);
@@ -219,7 +219,7 @@ h2 {
   font-size: clamp(35px, 3.2vw, 48px);
   line-height: 1.3;
   font-weight: 400;
-  letter-spacing: 3px;
+  letter-spacing: -1.2px;
 }
 .mission-intro h1 span {
   display: block;
@@ -446,7 +446,7 @@ select option {
 .result-panel[data-outcome="lost"] h2 {
   color: var(--amber);
 }
-/* 场景有独立尺寸，渲染与射线拾取使用相同容器。 */
+/* Rendering and raycasting share the same independently sized scene container. */
 .scene-section {
   display: grid;
   grid-template-rows: 65px minmax(400px, 1fr) 52px;
@@ -581,7 +581,7 @@ select option {
 .touch-hint {
   display: none;
 }
-/* 操作坞明确展示当前模式，触屏不依赖右键操作。 */
+/* Show the active input mode explicitly so touch controls do not require a right-click. */
 .control-footer {
   display: flex;
   align-items: center;
@@ -629,6 +629,7 @@ select option {
   background: transparent;
   color: var(--muted);
   font-size: 12px;
+  white-space: nowrap;
 }
 .mode-button[aria-pressed="true"] {
   color: #d8f4f5;
@@ -667,6 +668,7 @@ select option {
   border-radius: 4px;
   color: var(--muted);
   font-size: 11px;
+  white-space: nowrap;
 }
 .dock-button svg {
   width: 17px;
@@ -693,7 +695,7 @@ select option {
   width: 19px;
   height: 19px;
 }
-/* 原生对话框保留焦点约束与系统关闭行为。 */
+/* Native dialogs preserve focus containment and standard dismissal behavior. */
 .mission-dialog {
   width: min(540px, calc(100vw - 36px));
   max-height: calc(100svh - 48px);
@@ -703,6 +705,7 @@ select option {
   background: #0f1a24;
   color: var(--ink);
   box-shadow: 0 35px 100px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
 }
 .mission-dialog::backdrop {
   background: rgba(3, 8, 13, 0.79);
@@ -821,7 +824,7 @@ kbd {
   white-space: nowrap;
   border: 0;
 }
-/* 无图形上下文时保留相同逻辑的可滚动棋盘。 */
+/* Keep a scrollable board with the same game rules when WebGL is unavailable. */
 .fallback-board {
   position: absolute;
   inset: 15px;
@@ -959,7 +962,7 @@ kbd {
     padding: 0 2px;
   }
 }
-/* 移动端把任务栏压为两行，棋盘仍保持足够的独立高度。 */
+/* Compact the mission rail on mobile while preserving enough height for the board. */
 @media (max-width: 760px) {
   .expedition {
     padding: 0 22px;
@@ -1078,16 +1081,17 @@ kbd {
     padding: 0;
     border: 0;
     grid-column: 1/-1;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-items: flex-start;
-    gap: 12px;
+    gap: 4px;
   }
   .status-heading {
     gap: 6px;
     flex-shrink: 0;
   }
   .status-heading h2 {
-    font-size: 10px;
+    font-size: 11px;
   }
   .status-heading .signal-dot {
     width: 4px;
@@ -1111,7 +1115,7 @@ kbd {
     margin: 7px 0 11px;
   }
   .scene-section {
-    grid-template-rows: 43px minmax(355px, 1fr) 40px;
+    grid-template-rows: 43px minmax(355px, 1fr) 44px;
     min-height: 440px;
   }
   .scene-viewport {
@@ -1130,9 +1134,12 @@ kbd {
     font-size: 13px;
   }
   .scene-bottomline {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-size: 9px;
     letter-spacing: 0;
-    gap: 10px;
+    gap: 2px;
   }
   .scene-hint {
     font-size: 9px;
@@ -1160,6 +1167,7 @@ kbd {
     display: none;
   }
   .control-dock {
+    max-width: 100%;
     padding: 5px;
     gap: 8px;
   }
@@ -1205,7 +1213,13 @@ kbd {
     font-size: 24px;
   }
   .dialog-actions {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .dialog-actions > button {
+    padding: 0 10px;
+    font-size: 11px;
   }
 }
 @media (max-width: 460px) {
@@ -1256,11 +1270,11 @@ kbd {
     font-size: 10px;
   }
   .mission-status {
-    gap: 9px;
+    gap: 4px;
   }
   .scene-section {
     min-height: 427px;
-    grid-template-rows: 39px minmax(350px, 1fr) 38px;
+    grid-template-rows: 39px minmax(350px, 1fr) 44px;
   }
   .scene-viewport {
     min-height: 350px;
@@ -1273,16 +1287,23 @@ kbd {
   .control-dock {
     width: 100%;
     justify-content: space-between;
-    gap: 7px;
+    gap: 5px;
   }
   .mode-switch {
     flex: 1;
+    min-width: 0;
   }
   .mode-button {
     min-width: 0;
     flex: 1;
-    padding: 0 10px;
-    gap: 7px;
+    padding: 0 7px;
+    gap: 5px;
+    font-size: 11px;
+  }
+  .mode-button svg,
+  .dock-button svg {
+    width: 16px;
+    height: 16px;
   }
   .dock-divider {
     margin: 0 1px;
@@ -1291,8 +1312,8 @@ kbd {
     gap: 0;
   }
   .dock-button {
-    padding: 0 9px;
-    gap: 5px;
+    padding: 0 7px;
+    gap: 4px;
   }
   .dock-button > span {
     font-size: 10px;
@@ -1303,13 +1324,13 @@ kbd {
     font-size: 10px;
   }
   .scene-bottomline {
-    align-items: center;
+    align-items: flex-start;
   }
   .scene-hint {
-    font-size: 8px;
+    font-size: 9px;
   }
   #cell-readout {
-    font-size: 8px;
+    font-size: 9px;
   }
 }
 @media (max-width: 360px) {
@@ -1335,10 +1356,15 @@ kbd {
     font-size: 18px;
   }
   .mode-button {
-    padding: 0 7px;
+    padding: 0 6px;
+    gap: 4px;
+    font-size: 10px;
   }
   .dock-button {
-    padding: 0 7px;
+    padding: 0 6px;
+  }
+  .dock-button > span {
+    font-size: 9px;
   }
   .scene-projection {
     display: none !important;
@@ -1362,7 +1388,7 @@ kbd {
     scroll-behavior: auto !important;
   }
 }
-/* 兼容模式提示置于棋盘上方，避免覆盖数字与点击目标。 */
+/* Place the compatibility notice above the grid so it does not cover numbers or click targets. */
 #scene-stage.fallback-active ~ .scene-status {
   inset: 0 10px auto;
   display: block;
@@ -1376,7 +1402,7 @@ kbd {
   top: 40px;
 }
 
-/* 笔记本视口中让操作坞保持可见，长状态面板在侧栏内滚动。 */
+/* Keep the toolbar visible on laptop screens and scroll long status content within the rail. */
 @media (min-width: 761px) and (max-height: 950px) {
   .expedition {
     height: 100svh;
@@ -1423,7 +1449,7 @@ kbd {
   }
 }
 
-/* 音乐与音效独立控制，小屏保证四个触控入口均可达。 */
+/* Keep independent music and sound controls reachable alongside the other header actions on small screens. */
 .music-button[aria-pressed="true"] .music-off {
   display: none;
 }

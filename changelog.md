@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A victory fireworks sequence with rising golden trails, colorful aerial bursts, and synchronized sound effects. Celebration effects respect reduced motion and stop immediately when a new survey begins.
+
+### Changed
+
+- Balanced the reactor lighting with a soft cyan glow and visible crystal facets, reducing glare while keeping the scene luminous.
+- Switched repository documentation, interface copy, and source comments to English, and standardized native build names as `Minesweeper.app` and `Minesweeper`.
+
 ## 2.0.0 — 2026-09-21
 
 ### Added

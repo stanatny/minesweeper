@@ -1,8 +1,8 @@
-// 原创本地合成：独立音乐与音效总线，仅在用户手势 unlock 后创建音频上下文。
+// Original local synthesis with separate music and effects buses; create the audio context only after a user gesture calls unlock.
 export class SurveyAudio {
   /**
-   * 创建音频控制器，不立即播放或申请音频上下文。
-   * @returns {SurveyAudio} 默认开启音乐及音效，等待用户手势解锁。
+   * Create an audio controller without starting playback or requesting an audio context.
+   * @returns {SurveyAudio} Music and effects default to enabled and wait for a user gesture to unlock playback.
    */
   constructor() {
     this.enabled = true;
@@ -23,8 +23,8 @@ export class SurveyAudio {
   }
 
   /**
-   * 在 pointerdown/keydown 等用户手势中建立或恢复音频。
-   * @returns {Promise<boolean>} 成功运行时返回 true；不支持或被浏览器拒绝时返回 false。
+   * Create or resume audio from a user gesture such as pointerdown or keydown.
+   * @returns {Promise<boolean>} True when audio is running, or false if unsupported or blocked by the browser.
    */
   async unlock() {
     if (this.disposed || this.isHidden()) return false;
@@ -60,9 +60,9 @@ export class SurveyAudio {
   }
 
   /**
-   * 开关操作音及爆炸音，不改变音乐偏好。
-   * @param {boolean} value 是否开启音效。
-   * @returns {void} 静音立即生效，并停止仍在播放的音效声部。
+   * Enable or disable interaction and explosion sounds without changing the music preference.
+   * @param {boolean} value Whether sound effects are enabled.
+   * @returns {void} Muting takes effect immediately and stops active sound-effect voices.
    */
   setEnabled(value) {
     this.enabled = Boolean(value);
@@ -71,9 +71,9 @@ export class SurveyAudio {
   }
 
   /**
-   * 独立开关背景音乐，不创建音频上下文。
-   * @param {boolean} value 是否开启音乐。
-   * @returns {void} 关闭时清除调度器和音乐声部。
+   * Toggle background music independently without creating an audio context.
+   * @param {boolean} value Whether background music is enabled.
+   * @returns {void} Disabling music clears its scheduler and voices.
    */
   setMusicEnabled(value) {
     this.musicEnabled = Boolean(value);
@@ -83,9 +83,9 @@ export class SurveyAudio {
   }
 
   /**
-   * 播放操作反馈，保留旧调用方式。
+   * Play interaction feedback while preserving the existing call interface.
    * @param {string} action reveal/chord/flag/unflag/win/lose。
-   * @returns {void} lose 播放单次爆炸；逐个连锁应直接调用 playExplosion。
+   * @returns {void} lose plays one explosion; chain reactions should call playExplosion for each blast.
    */
   play(action) {
     if (action === "lose") {
@@ -118,9 +118,9 @@ export class SurveyAudio {
   }
 
   /**
-   * 与一次视觉爆炸同步播放冲击、下坠低频与碎片尾音。
-   * @param {object} options 连锁序号 index、总数 total、左右声像 pan（-1 到 1）。
-   * @returns {void} 每次调用仅触发一颗雷，不预先调度整条连锁。
+   * Play an impact, descending bass, and a debris tail in sync with one visual explosion.
+   * @param {object} options Chain index, total mine count, and stereo pan from -1 to 1.
+   * @returns {void} Each call triggers one mine without scheduling the entire chain in advance.
    */
   playExplosion({ index = 0, total = 1, pan = 0 } = {}) {
     if (!this.canPlay("sfx")) return;
@@ -134,7 +134,7 @@ export class SurveyAudio {
     const active = [...this.voices].filter(
       (voice) => voice.group === "sfx" && voice.explosion,
     );
-    // 前三颗保留冲击力，密集阶段按活跃声部数为同帧低频叠加预留余量。
+    // Keep the first three blasts punchy, then reserve bass headroom based on active voices during the dense finale.
     const headroom =
       order < 3 ? 1 : Math.min(1, Math.sqrt(3 / (active.length + 1)));
     if (active.length >= 9) active[0].stop();
@@ -153,7 +153,7 @@ export class SurveyAudio {
     const nodes = [output, panner];
     const sounds = [];
 
-    // 低通噪声提供空气冲击；频率快速下落，避免持续刺耳的白噪声。
+    // Low-pass noise supplies the air impact; its cutoff falls quickly to avoid sustained harsh white noise.
     const blast = context.createBufferSource();
     blast.buffer = this.noiseBuffer;
     blast.playbackRate.value = 0.82 + variation * 0.35;
@@ -168,7 +168,7 @@ export class SurveyAudio {
     nodes.push(blastFilter, blastEnvelope);
     sounds.push({ source: blast, at, duration: 0.41, offset: variation * 0.3 });
 
-    // 两层不同下坠速率的低频形成短促、可辨认的爆破重量。
+    // Two bass layers descend at different rates to give each brief blast a distinct sense of weight.
     for (let layer = 0; layer < 2; layer += 1) {
       const oscillator = context.createOscillator();
       const gain = context.createGain();
@@ -197,7 +197,7 @@ export class SurveyAudio {
       });
     }
 
-    // 稍晚的窄带碎片尾音增加颗粒感，声量显著低于主体冲击。
+    // A slightly delayed narrow-band debris tail adds texture at a much lower level than the main impact.
     const shards = context.createBufferSource();
     shards.buffer = this.noiseBuffer;
     shards.playbackRate.value = 1.25 + variation * 0.5;
@@ -221,9 +221,126 @@ export class SurveyAudio {
   }
 
   /**
-   * 调整音乐氛围，保留用户的音乐与音效设置。
-   * @param {string} mood ready、playing、lost 或 won。
-   * @returns {void} 已播放长音自然结束，新音符使用更新后的情绪。
+   * Play a soft rising launch or a bright pop with a short sparkle tail.
+   * @param {string} phase "launch" or "burst", matching the visual firework event.
+   * @param {object} options Strength from 0 to 1.5 and stereo pan from -1 to 1.
+   * @returns {void} At most four firework voices share the effects bus and its lifecycle.
+   */
+  playFirework(phase, { strength = 1, pan = 0 } = {}) {
+    if ((phase !== "launch" && phase !== "burst") || !this.canPlay("sfx"))
+      return;
+    const force = Number.isFinite(strength)
+      ? Math.max(0, Math.min(1.5, strength))
+      : 1;
+    if (force === 0) return;
+    const active = [...this.voices].filter((voice) => voice.firework);
+    if (active.length >= 4) active.shift().stop();
+
+    const context = this.context;
+    const at = context.currentTime + 0.004;
+    const launch = phase === "launch";
+    const output = context.createGain();
+    // Keep simultaneous pops below the victory chord, including the densest finale.
+    output.gain.value = force * Math.min(1, Math.sqrt(2 / (active.length + 1)));
+    const panner = context.createStereoPanner
+      ? context.createStereoPanner()
+      : context.createGain();
+    if (panner.pan)
+      panner.pan.value = Number.isFinite(pan)
+        ? Math.max(-1, Math.min(1, pan))
+        : 0;
+    output.connect(panner);
+    panner.connect(this.sfxGain);
+    const nodes = [output, panner];
+    const sounds = [];
+
+    // A narrow noise band rises with the rocket; a burst uses a brief, bass-free pop.
+    const air = context.createBufferSource();
+    air.buffer = this.noiseBuffer;
+    air.playbackRate.value = launch ? 0.9 : 1.35;
+    const filter = context.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.Q.value = launch ? 1.1 : 0.8;
+    filter.frequency.setValueAtTime(launch ? 700 : 1850, at);
+    filter.frequency.exponentialRampToValueAtTime(
+      launch ? 2250 : 1100,
+      at + (launch ? 0.38 : 0.085),
+    );
+    const airGain = context.createGain();
+    this.envelope(
+      airGain.gain,
+      at,
+      launch ? 0.065 : 0.003,
+      launch ? 0.025 : 0.065,
+      launch ? 0.42 : 0.105,
+    );
+    air.connect(filter).connect(airGain).connect(output);
+    nodes.push(filter, airGain);
+    sounds.push({
+      source: air,
+      at,
+      duration: launch ? 0.46 : 0.14,
+      offset: launch ? 0.15 : 0.65,
+    });
+
+    // Sine glints stay in the upper register and leave room for the existing win chord.
+    const pitches = launch ? [880] : [1760, 2637.02];
+    pitches.forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const begins = at + (launch ? 0.025 : 0.022 + index * 0.055);
+      const duration = launch ? 0.36 : 0.25 + index * 0.06;
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, begins);
+      oscillator.frequency.exponentialRampToValueAtTime(
+        launch ? 1760 : frequency * 0.985,
+        begins + duration,
+      );
+      this.envelope(
+        gain.gain,
+        begins,
+        launch ? 0.05 : 0.005,
+        launch ? 0.007 : 0.009 / (index + 1),
+        duration,
+      );
+      oscillator.connect(gain).connect(output);
+      nodes.push(gain);
+      sounds.push({
+        source: oscillator,
+        at: begins,
+        duration: duration + 0.03,
+      });
+    });
+
+    const voice = this.registerVoice(sounds, nodes, "sfx");
+    if (voice) {
+      voice.firework = true;
+      voice.fireworkPhase = phase;
+    }
+  }
+
+  /**
+   * Count live firework voices, excluding music and other game sounds.
+   * @returns {number} Active launch and burst voices, bounded by four.
+   */
+  get fireworkVoiceCount() {
+    let count = 0;
+    for (const voice of this.voices) if (voice.firework) count += 1;
+    return count;
+  }
+
+  /**
+   * Stop current firework voices without interrupting music or the victory chord.
+   * @returns {void} Safe before unlocking audio and after disposal.
+   */
+  stopFireworks() {
+    for (const voice of [...this.voices]) if (voice.firework) voice.stop();
+  }
+
+  /**
+   * Adjust the musical mood while preserving the music and sound-effect preferences.
+   * @param {string} mood ready, playing, lost, or won.
+   * @returns {void} Sustained notes finish naturally, and new notes use the updated mood.
    */
   setMood(mood) {
     if (!["ready", "playing", "lost", "won"].includes(mood)) return;
@@ -236,8 +353,8 @@ export class SurveyAudio {
   }
 
   /**
-   * 重置棋局声音和音乐段落，不修改静音选择。
-   * @returns {void} 清除尚在播放的爆炸，随后以柔和起音恢复音乐。
+   * Reset game sounds and the musical phrase without changing mute preferences.
+   * @returns {void} Stop ongoing effects, then restart the music with a gentle attack.
    */
   reset() {
     if (this.disposed) return;
@@ -249,8 +366,8 @@ export class SurveyAudio {
   }
 
   /**
-   * 释放事件、调度器、音频节点与音频上下文。
-   * @returns {void} 可以重复调用。
+   * Release event listeners, the scheduler, audio nodes, and the audio context.
+   * @returns {void} Repeated calls are safe.
    */
   dispose() {
     if (this.disposed) return;
@@ -329,7 +446,7 @@ export class SurveyAudio {
   setBus(bus, value) {
     if (!bus || !this.context || this.context.state === "closed") return;
     try {
-      // 清除总线的旧自动化，连同静默分支中缓存的上一音量一起重置。
+      // Clear previous bus automation and reset the cached volume, including values retained while muted.
       bus.gain.cancelScheduledValues(0);
       bus.gain.value = value;
       bus.gain.setValueAtTime(value, this.context.currentTime);
@@ -436,7 +553,7 @@ export class SurveyAudio {
     if (this.scheduler !== null || !this.unlocked || !this.canPlay("music"))
       return;
     this.nextBeatAt = this.context.currentTime + 0.035;
-    // 恢复时从完整和弦开始，避免只有低频脉冲而没有铺底。
+    // Resume on a complete chord so the bass pulse is accompanied by the ambient pad.
     this.beat -= this.beat % 8;
     this.scheduler = setInterval(() => this.scheduleMusic(), 60);
     this.scheduleMusic();

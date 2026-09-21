@@ -5,7 +5,7 @@ const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const BROWSER_ERRORS = [];
 const CLEANUP_LIMIT_MS = 200;
 
-// 调试入口只读取真实棋局和渲染资源，翻格、触雷、重开均经过真实界面。
+// Test hooks only inspect the real board and rendering resources; reveal, loss, and restart use real UI input.
 async function clickCell(page, id) {
   const point = await page.evaluate(
     (cellId) => window.__surveyTest.getScene().projectCell(cellId),
@@ -100,7 +100,7 @@ async function effectState(page) {
   });
 }
 
-// 在渲染帧内记录效果和清理时间，避免 Node 轮询错过短喷焰或掩盖延迟清理。
+// Sample effects and cleanup in render frames so Node polling cannot miss short flame jets or hide delayed cleanup.
 async function armProbe(page, stopAfter = "complete") {
   await page.evaluate((target) => {
     const previous = window.__flameEffectsProbe;
@@ -166,7 +166,7 @@ async function armProbe(page, stopAfter = "complete") {
           sequenceActive: sequence.active,
           sequenceCompleted: sequence.completed,
         });
-        // 多观察一小段时间，验证完成或重开后没有残留回调再次点燃喷焰。
+        // Keep observing briefly to catch stale callbacks that might reignite flames after completion or restart.
         if (endpoint !== null && now - endpoint >= 220) {
           probe.done = true;
           return;

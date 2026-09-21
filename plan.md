@@ -1,19 +1,19 @@
-# 扫雷游戏开发计划
+# Minesweeper Development Plan
 
-> 归档：以下为旧版二维实现计划。2026-09-21 的三维网页版以 README.md 和 js/explorer.js 为当前入口；原 macOS SwiftUI 版本继续保留。
+> Archived: this plan describes the original 2D implementation. For the 3D browser version introduced on 2026-09-21, see README.md and js/explorer.js. The native macOS SwiftUI version remains available.
 
-目标：macOS 可运行的经典 Windows 玩法扫雷（浏览器打开的单页应用）。
+Goal: a single-page browser game that runs on macOS and follows classic Windows Minesweeper rules.
 
-## 文件结构
+## Original file structure
 
-- index.html — 页面结构（契约定义 DOM id）
-- css/style.css — Windows 经典风格样式
-- js/audio.js — Web Audio 合成音效，全局 API `GameAudio`
-- js/effects.js — Canvas 粒子爆炸/震屏/胜利庆祝，全局 API `GameFX`
-- js/game.js — 游戏逻辑（布雷、翻开、插旗、计时、胜负判定）
+- `index.html`: Page structure with agreed DOM IDs.
+- `css/style.css`: Classic Windows-style presentation.
+- `js/audio.js`: Synthesized Web Audio effects exposed through the global `GameAudio` API.
+- `js/effects.js`: Canvas explosion particles, screen shake, and victory celebrations exposed through the global `GameFX` API.
+- `js/game.js`: Mine placement, reveals, flags, timing, and win/loss detection.
 
-## 阶段
+## Stages
 
-1. 并行开发 4 个模块（共享接口契约，互不修改对方文件）
-2. 集成校验：语法检查 + 契约一致性检查 + 修复对接问题
-3. 交付：双击 index.html 运行
+1. Develop the four modules in parallel against shared interfaces, without editing another module's files.
+2. Integrate the modules, check syntax and interface consistency, and resolve integration issues.
+3. Deliver a game that launches by opening `index.html` directly.

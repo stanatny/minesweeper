@@ -1,12 +1,12 @@
 /**
- * 扫雷状态引擎：独立于渲染与输入方式，支持三维场景、键盘操作和测试。
- * cells 保存完整棋局；对外展示请使用不包含隐藏答案的 snapshot()。
+ * Minesweeper state engine, independent of rendering and input, for 3D scenes, keyboard controls, and tests.
+ * cells stores the full board; use snapshot() for presentation to avoid exposing hidden answers.
  */
 export class Minefield {
   /**
-   * 创建待开始的棋局。
-   * @param {object} options 宽、高、雷数及可注入的随机数函数。
-   * @returns {Minefield} 尚未布雷的棋局，首击时生成安全邻域。
+   * Create a board that is ready to start.
+   * @param {object} options Board width, height, mine count, and an optional random number generator.
+   * @returns {Minefield} An unseeded board that reserves a safe neighborhood on the first reveal.
    */
   constructor({
     width = 9,
@@ -50,9 +50,9 @@ export class Minefield {
   }
 
   /**
-   * 翻开一格，空白区域自动展开；首次翻开排除周围八格的雷。
-   * @param {number} id 从零开始、按行排列的格子编号。
-   * @returns {object} 改变的格子编号、棋局状态及实际动作。
+   * Reveal a cell and expand empty regions; the first reveal and its eight neighbors are mine-free.
+   * @param {number} id Zero-based cell index in row-major order.
+   * @returns {object} Changed cell IDs, the game status, and the resulting action.
    */
   reveal(id) {
     if (!this.#canAct(id)) return this.#result();
@@ -74,9 +74,9 @@ export class Minefield {
   }
 
   /**
-   * 切换未翻开格子的旗标；首击前及结束后无操作。
-   * @param {number} id 格子编号。
-   * @returns {object} 改变的格子编号、棋局状态及 flag/unflag/noop 动作。
+   * Toggle a flag on a covered cell; do nothing before the first reveal or after the game ends.
+   * @param {number} id Cell index.
+   * @returns {object} Changed cell IDs, the game status, and a flag, unflag, or noop action.
    */
   toggleFlag(id) {
     if (!this.#canAct(id) || this.status !== "playing") return this.#result();
@@ -88,9 +88,9 @@ export class Minefield {
   }
 
   /**
-   * 数字周围的旗数匹配时，翻开剩余邻格；误标可能触雷。
-   * @param {number} id 已翻开的数字格编号。
-   * @returns {object} 改变的格子编号、棋局状态及 chord/lose/win/noop 动作。
+   * Reveal remaining neighbors when adjacent flags match the number; incorrect flags can trigger a mine.
+   * @param {number} id Index of a revealed numbered cell.
+   * @returns {object} Changed cell IDs, the game status, and a chord, lose, win, or noop action.
    */
   chord(id) {
     if (!this.#canAct(id) || this.status !== "playing") return this.#result();
@@ -117,9 +117,9 @@ export class Minefield {
   }
 
   /**
-   * 获取有效的八方向邻格，按从上到下、从左到右的顺序返回。
-   * @param {number} id 格子编号；非法编号不会改变棋局。
-   * @returns {number[]} 邻格编号，非法编号返回空数组。
+   * Return valid neighbors in all eight directions, ordered from top to bottom and left to right.
+   * @param {number} id Cell index; invalid indices do not change the board.
+   * @returns {number[]} Neighbor indices, or an empty array for an invalid index.
    */
   neighbors(id) {
     if (!this.#isValidId(id)) return [];
@@ -144,8 +144,8 @@ export class Minefield {
   }
 
   /**
-   * 获取供界面及无障碍文本使用的独立快照。
-   * @returns {object} 棋局和格子副本；隐藏格的 mine、adjacent 均为 null。
+   * Create a detached snapshot for the interface and accessibility text.
+   * @returns {object} Copies of the game and cells; covered cells have null mine and adjacent values.
    */
   snapshot() {
     return {
@@ -194,7 +194,7 @@ export class Minefield {
       .filter((cell) => !forbidden.has(cell.id))
       .map((cell) => cell.id);
 
-    // 先完成随机抽样再修改棋局，随机源报错时仍保留初始状态。
+    // Finish random sampling before changing the board so a failing random source leaves the initial state intact.
     for (let index = candidates.length - 1; index > 0; index -= 1) {
       const sample = this.#random();
       if (!Number.isFinite(sample) || sample < 0 || sample >= 1) {

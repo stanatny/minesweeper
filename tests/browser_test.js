@@ -8,7 +8,7 @@ const ARTIFACT_DIR = resolve("artifacts");
 const BROWSER_ERRORS = [];
 const CHECKS = [];
 
-// 测试只读取本地调试接口；所有改变棋局的操作均经过真实鼠标、触屏或键盘。
+// Only read local test hooks; every board change uses real mouse, touch, or keyboard input.
 async function gameState(page) {
   return page.evaluate(() => {
     const game = window.__surveyTest.getGame();
@@ -233,7 +233,7 @@ try {
   passed("orbit drag preserves the game state");
 
   let chord = await findChord(page);
-  // 极端随机棋局可能缺少可连开的边界，通过实际翻开安全格形成边界。
+  // If a random board lacks a chord opportunity, reveal safe tiles through real input to expose a boundary.
   for (let attempts = 0; !chord && attempts < 30; attempts += 1) {
     state = await gameState(page);
     const next = state.cells.find(

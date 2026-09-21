@@ -1,5 +1,5 @@
-// FlameJets 用固定实例池生成竖直喷焰、偏斜火舌与短烟尾，不加载外部素材。
-// 参数：THREE 为宿主 Three.js 模块，parent 为挂载节点；activeCount 包含仍在消散的烟尾。
+// FlameJets uses a fixed instance pool for vertical jets, angled flame tongues, and short smoke trails without external assets.
+// Accepts the host Three.js module and a parent node; activeCount includes smoke trails that are still fading.
 export class FlameJets {
   constructor(THREE, parent) {
     this.THREE = THREE;
@@ -17,7 +17,7 @@ export class FlameJets {
     this.serial = 0;
     this.matrix = new THREE.Matrix4();
 
-    // 每个爆点三条火舌加一个地面火圈；两种造型共用同一材质和一次绘制。
+    // Each blast has three flame tongues and a ground ring; both shapes share one material and draw call.
     const fireGeometry = new THREE.PlaneGeometry(1, 1, 4, 12);
     fireGeometry.translate(0, 0.5, 0);
     this.fireParameters = new THREE.InstancedBufferAttribute(
@@ -49,7 +49,7 @@ export class FlameJets {
     this.fire.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.group.add(this.fire);
 
-    // 每处最多四片烟，最后一片在触发后 0.98 秒内消失。
+    // Each blast has at most four smoke planes, with the last fading within 0.98 seconds of ignition.
     const smokeGeometry = new THREE.PlaneGeometry(1, 1);
     this.smokeParameters = new THREE.InstancedBufferAttribute(
       new Float32Array(this.capacity * 4 * 4),
@@ -76,7 +76,7 @@ export class FlameJets {
     this.clear();
   }
 
-  // trigger 在指定三维坐标触发一次喷射；池满时替换最早的烟尾，不增加对象数量。
+  // trigger starts a jet at the given 3D position, replacing the oldest smoke trail when the pool is full without adding objects.
   trigger({ x, y = 0.48, z }) {
     if (this.disposed) return;
     if (![x, y, z].every(Number.isFinite))
@@ -136,7 +136,7 @@ export class FlameJets {
     this.group.visible = true;
   }
 
-  // update 参数 delta 为秒；火焰在 0.74 秒内熄灭，烟尾最多持续到 0.98 秒。
+  // update accepts delta in seconds; flames die out within 0.74 seconds and smoke lasts at most 0.98 seconds.
   update(delta) {
     if (this.disposed || !this.activeCount) return;
     const step = Number.isFinite(delta) ? Math.max(0, delta) : 0;
@@ -159,7 +159,7 @@ export class FlameJets {
     this.group.visible = this.activeCount > 0;
   }
 
-  // clear 立即清除喷焰和烟尾，保留实例池以便下一局复用。
+  // clear immediately removes jets and smoke while retaining the instance pool for the next round.
   clear() {
     if (this.disposed) return;
     for (let index = 0; index < this.capacity; index++) {
@@ -175,7 +175,7 @@ export class FlameJets {
     this.group.visible = false;
   }
 
-  // dispose 回收实例缓冲、几何及材质；可以重复调用。
+  // dispose releases instance buffers, geometry, and materials; repeated calls are safe.
   dispose() {
     if (this.disposed) return;
     this.clear();

@@ -8,6 +8,7 @@ import { createCosmicEnvironment } from "./cosmic_environment.js";
 import { SurveyEffects } from "./survey_effects.js";
 import { MineModels } from "./mine_model.js";
 import { DetonationSequence } from "./detonation_sequence.js";
+import { VictoryFireworks } from "./victory_fireworks.js";
 
 const PALETTE = {
   closed: new THREE.Color("#344352"),
@@ -17,7 +18,7 @@ const PALETTE = {
   danger: new THREE.Color("#82453a"),
 };
 
-// SurveyScene 将规则引擎的公开快照变成可旋转的遗迹阵列，并返回真实命中的格子编号。
+// SurveyScene renders public game snapshots as an orbitable ruin and reports the cell hit by input.
 export class SurveyScene {
   constructor(
     container,
@@ -28,6 +29,8 @@ export class SurveyScene {
       onHover,
       onFailure,
       onExplosion,
+      onFirework,
+      onFireworksStop,
       onChainComplete,
     },
   ) {
@@ -39,6 +42,8 @@ export class SurveyScene {
       onHover,
       onFailure,
       onExplosion,
+      onFirework,
+      onFireworksStop,
       onChainComplete,
     };
     this.detonation = new DetonationSequence();
@@ -110,6 +115,11 @@ export class SurveyScene {
     this.effects = new SurveyEffects(THREE, this.scene, {
       reducedMotion: () => this.reducedMotion.matches,
     });
+    this.fireworks = new VictoryFireworks(THREE, this.scene, {
+      reducedMotion: () => this.reducedMotion.matches,
+      onLaunch: (event) => this.callbacks.onFirework?.("launch", event),
+      onBurst: (event) => this.callbacks.onFirework?.("burst", event),
+    });
     this.bindEvents();
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
@@ -125,9 +135,11 @@ export class SurveyScene {
     this.frame = requestAnimationFrame((time) => this.animate(time));
   }
 
-  // rebuild 参数是无隐藏雷信息的快照；重建时回收旧几何及材质，避免反复开局泄漏显存。
+  // Rebuild from a snapshot with hidden mines masked; release old geometry and materials before starting a new board.
   rebuild(snapshot) {
     this.detonation.reset();
+    this.fireworks.clear();
+    this.callbacks.onFireworksStop?.();
     this.mines?.dispose();
     this.effects.clear();
     this.disposeGroup(this.board);
@@ -261,8 +273,9 @@ export class SurveyScene {
     this.resetCamera();
   }
 
-  // update 同步可见状态。首次点击前的造型仅由坐标决定，不能泄漏随机布雷信息。
+  // Synchronize visible state. Before the first reveal, geometry depends only on coordinates and cannot expose mine placement.
   update(snapshot, event = { changed: [], action: "noop" }) {
+    const previousStatus = this.snapshot?.status;
     this.snapshot = snapshot;
     if (!this.tiles) return;
     if (event.action === "lose") this.detonation.start(snapshot);
@@ -284,7 +297,11 @@ export class SurveyScene {
       );
       this.pulseAge = this.reducedMotion.matches ? 99 : 0;
     }
-    if (snapshot.status === "won") this.trimMaterial.color.set("#adf2c9");
+    if (snapshot.status === "won") {
+      this.trimMaterial.color.set("#adf2c9");
+      if (previousStatus !== "won")
+        this.fireworks.start({ width: this.width, height: this.height });
+    }
     if (snapshot.status === "lost") this.trimMaterial.color.set("#cd7959");
   }
 
@@ -292,7 +309,7 @@ export class SurveyScene {
     this.mode = mode;
   }
 
-  // focus 用同一三维投影显示键盘选择，保证键盘与鼠标落在相同的格子。
+  // Show keyboard selection through the same projection used for pointer hit testing.
   focus(id) {
     this.hoverId = -1;
     this.focusId = id;
@@ -426,7 +443,7 @@ export class SurveyScene {
       color: new THREE.Color("#63e9f0").multiplyScalar(2.2),
     });
 
-    // 每一块舱盖下方都是独立的断裂岩柱；上表面规则不变，下缘形成破碎岛屿轮廓。
+    // Individual fractured columns form the island silhouette beneath a regular, playable grid.
     const columnGeometry = new THREE.CylinderGeometry(0.67, 0.22, 1, 4, 1);
     columnGeometry.rotateY(Math.PI / 4);
     const columns = new THREE.InstancedMesh(columnGeometry, basalt, this.count);
@@ -471,24 +488,27 @@ export class SurveyScene {
     island.rotation.y = 0.13;
     this.board.add(island);
 
-    // 中央能源晶体与陀螺环让遗迹拥有明显的纵向结构。
+    // The reactor and gyroscopic rings add depth beneath the grid; their restrained glow keeps the default view comfortable.
     this.core = new THREE.Mesh(
       new THREE.OctahedronGeometry(0.75, 0),
       new THREE.MeshStandardMaterial({
-        color: "#affcff",
-        emissive: "#23c5e0",
-        emissiveIntensity: 2.8,
+        color: "#41616b",
+        emissive: "#2e9fb2",
+        emissiveIntensity: 1.05,
         metalness: 0.42,
-        roughness: 0.16,
+        roughness: 0.48,
       }),
     );
     this.core.position.set(w * 0.08, -3.5, h * 0.32);
     this.core.scale.y = 1.65;
     this.core.rotation.y = 0.4;
     this.board.add(this.core);
-    const light = new THREE.PointLight("#30d3ef", 20, span * 1.4, 2);
+    const light = new THREE.PointLight("#387d8d", 7, span * 1.4, 2);
     light.position.copy(this.core.position);
     this.board.add(light);
+    const reactorRingMaterial = new THREE.MeshBasicMaterial({
+      color: "#499ba5",
+    });
     for (let i = 0; i < 3; i++) {
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(
@@ -498,7 +518,7 @@ export class SurveyScene {
           72,
           Math.PI * 1.72,
         ),
-        i === 0 ? energy : metal,
+        i === 0 ? reactorRingMaterial : metal,
       );
       ring.position.copy(this.core.position);
       ring.rotation.set(0.6 + i * 0.8, i * 1.3, i * 0.5);
@@ -509,18 +529,18 @@ export class SurveyScene {
     const coreGlow = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: glowTexture,
-        color: "#29d5fa",
+        color: "#399fb1",
         transparent: true,
-        opacity: 0.32,
+        opacity: 0.14,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       }),
     );
     coreGlow.position.copy(this.core.position);
-    coreGlow.scale.set(5, 5, 1);
+    coreGlow.scale.set(3.2, 3.2, 1);
     this.board.add(coreGlow);
 
-    // 两圈断开的导航轨道围绕遗迹慢速运动，交互棋盘本身始终稳定。
+    // Broken navigation rings orbit slowly around the ruin while the interactive grid stays still.
     this.orbitalRings = new THREE.Group();
     this.orbitalRings.position.y = -1.15;
     const radius = Math.hypot(w, h) * 0.57;
@@ -574,7 +594,7 @@ export class SurveyScene {
         map: glowTexture,
         color: "#274775",
         transparent: true,
-        opacity: 0.45,
+        opacity: 0.3,
         depthWrite: false,
         side: THREE.DoubleSide,
         blending: THREE.AdditiveBlending,
@@ -770,7 +790,7 @@ export class SurveyScene {
     this.updateLabels();
   }
 
-  // 雷的外观随引爆时间线变化；规则引擎仍然只结算一次失败。
+  // Mine appearance follows the detonation timeline; the rules engine settles the loss only once.
   updateMineModels() {
     const items = [];
     for (const cell of this.presentation.cells) {
@@ -970,6 +990,10 @@ export class SurveyScene {
     this.controls.update();
     this.cosmos.update(time / 1000, this.reducedMotion.matches);
     this.effects.update(elapsed, time / 1000);
+    const wasCelebrating = this.fireworks.active;
+    this.fireworks.update(elapsed);
+    if (wasCelebrating && !this.fireworks.active)
+      this.callbacks.onFireworksStop?.();
     this.advanceDetonation(elapsed);
     let changing = false;
     for (let i = 0; i < this.motions.length; i++) {
@@ -987,7 +1011,7 @@ export class SurveyScene {
     if (this.orbitalRings && !this.reducedMotion.matches) {
       this.orbitalRings.rotation.y = time * 0.00004;
       this.core.material.emissiveIntensity =
-        2.6 + Math.sin(time * 0.0018) * 0.45;
+        1.05 + Math.sin(time * 0.0018) * 0.06;
     }
     this.composer.render();
     this.frame = requestAnimationFrame((next) => this.animate(next));
@@ -1018,6 +1042,8 @@ export class SurveyScene {
     this.controls.dispose();
     this.cosmos.dispose();
     this.effects.dispose();
+    this.fireworks.dispose();
+    this.callbacks.onFireworksStop?.();
     this.detonation.reset();
     this.mines?.dispose();
     this.disposeGroup(this.scene);
@@ -1029,7 +1055,7 @@ export class SurveyScene {
   }
 }
 
-// 倒角金属舱盖保留参数化源，无外部模型或贴图依赖。
+// Beveled metal covers are generated parametrically without external models or textures.
 function roundedTile(size, depth, radius) {
   return roundedPlate(size, size, depth, radius);
 }

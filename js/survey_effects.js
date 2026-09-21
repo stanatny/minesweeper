@@ -1,16 +1,16 @@
 import { FlameJets } from "./flame_jets.js";
 
 /**
- * SurveyEffects 提供局部扫描、信标和胜负反馈。
- * 所有效果使用固定对象池，数值信息上方不叠加不透明全屏特效。
+ * SurveyEffects provides local scan, beacon, victory, and loss feedback.
+ * All effects use fixed object pools and avoid opaque full-screen overlays that hide numeric information.
  */
 export class SurveyEffects {
   /**
-   * 创建场景效果池。
-   * @param {object} THREE 当前应用使用的 Three.js 模块。
-   * @param {object} scene 效果所在的三维场景。
-   * @param {object} options reducedMotion 返回当前是否减少动态效果。
-   * @returns {SurveyEffects} 可重复触发与清理的效果控制器。
+   * Create the scene effect pools.
+   * @param {object} THREE The Three.js module used by the application.
+   * @param {object} scene The 3D scene that contains the effects.
+   * @param {object} options reducedMotion reports whether reduced motion is currently enabled.
+   * @returns {SurveyEffects} An effect controller that can be triggered and cleared repeatedly.
    */
   constructor(THREE, scene, { reducedMotion = () => false } = {}) {
     this.THREE = THREE;
@@ -88,7 +88,7 @@ export class SurveyEffects {
     this.points.visible = false;
     this.root.add(this.points);
 
-    // 火星的拖尾沿真实速度方向延伸，使用同一固定粒子池与一次绘制。
+    // Ember trails follow their actual velocity, sharing the fixed particle pool and one draw call.
     this.trailPositions = new Float32Array(this.particles.length * 6);
     this.trailColors = new Float32Array(this.particles.length * 8);
     const trailGeometry = new THREE.BufferGeometry();
@@ -150,10 +150,10 @@ export class SurveyEffects {
   }
 
   /**
-   * 在一个格子或指定场景坐标触发效果。
-   * @param {string} action reveal、chord、flag、lose 或 win。
-   * @param {object} position 场景坐标 { x, z, y? }，默认高度为格子顶面。
-   * @returns {void} 不改变游戏状态，也不响应未定义的动作。
+   * Trigger an effect at a cell or a specified scene position.
+   * @param {string} action reveal, chord, flag, lose, or win.
+   * @param {object} position Scene coordinates { x, z, y? }, defaulting to the cell surface height.
+   * @returns {void} Does not change game state and ignores unknown actions.
    */
   trigger(action, position) {
     if (this.disposed || this.reducedMotion() || !this.colors[action]) return;
@@ -218,10 +218,10 @@ export class SurveyEffects {
   }
 
   /**
-   * 更新对象池的运动、衰减与上传缓冲。
-   * @param {number} delta 距上一帧的可见秒数；运动积分限幅，效果寿命按真实时间结束。
-   * @param {number} time 场景总时间，保留供场景统一调用，效果寿命仅依赖 delta。
-   * @returns {void} 寿命结束后自动隐藏效果。
+   * Update pooled movement, fading, and upload buffers.
+   * @param {number} delta Visible seconds since the previous frame; clamp motion integration but expire effects by real elapsed time.
+   * @param {number} time Total scene time, retained for the shared scene interface; effect lifetimes depend only on delta.
+   * @returns {void} Effects hide automatically when their lifetimes end.
    */
   update(delta, time) {
     if (this.disposed) return;
@@ -266,8 +266,8 @@ export class SurveyEffects {
   }
 
   /**
-   * 清空当前效果，供重开棋局或减少动态效果时调用。
-   * @returns {void} 保留可复用的 GPU 资源与对象池。
+   * Clear current effects when restarting or enabling reduced motion.
+   * @returns {void} Retain reusable GPU resources and object pools.
    */
   clear() {
     if (this.disposed) return;
@@ -285,8 +285,8 @@ export class SurveyEffects {
   }
 
   /**
-   * 从场景移除效果并释放资源，可安全重复调用。
-   * @returns {void} 释放后不再接收触发与更新。
+   * Remove effects from the scene and release resources; repeated calls are safe.
+   * @returns {void} Ignore triggers and updates after disposal.
    */
   dispose() {
     if (this.disposed) return;
@@ -500,7 +500,7 @@ export class SurveyEffects {
   }
 }
 
-// 小尺寸菱形碎光兼具亮芯与柔边，避免方形点精灵破坏材质。
+// Small diamond-shaped sparks combine bright cores and soft edges without square point-sprite artifacts.
 const PARTICLE_VERTEX = `
   attribute vec3 color;
   attribute float particleOpacity;
@@ -527,7 +527,7 @@ const PARTICLE_FRAGMENT = `
   }
 `;
 
-// 球形冲击波只绘制视角边缘，中心透明，保留数字和旗标的辨识度。
+// Spherical shockwaves render only the view-facing rim, keeping the center transparent so numbers and flags remain readable.
 const SHELL_VERTEX = `
   varying vec3 effectNormal;
   varying vec3 effectView;
@@ -552,7 +552,7 @@ const SHELL_FRAGMENT = `
   }
 `;
 
-// 有体积的热团先闪亮，再卷成暗烟；局限在雷附近，避免整盘白闪。
+// Volumetric heat flashes and then curls into dark smoke, staying near the mine to avoid a board-wide white flash.
 const FIRE_VERTEX = `
   uniform float effectAge;
   varying vec3 firePosition;

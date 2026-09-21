@@ -1,11 +1,10 @@
 #!/bin/bash
-# 编译并打包 扫雷.app（纯 swiftc，无 Xcode 工程）
-# - 部署目标 macOS 14（swiftc 默认编译为当前系统版本，会导致旧系统提示
-#   "不能与此版本的 macOS 配合使用"）
-# - 优先构建 arm64 + x86_64 通用二进制（Intel Mac 可用）；SDK 不支持时回退 arm64
+# Compile and package Minesweeper.app using swiftc without an Xcode project.
+# - Target macOS 14 rather than the build machine's OS version so older Macs can run it.
+# - Prefer a universal arm64 + x86_64 binary; fall back to arm64 if the SDK cannot build both.
 set -e
 cd "$(dirname "$0")"
-APP="扫雷.app"
+APP="Minesweeper.app"
 SRC="mac/MinesweeperApp.swift mac/GameModel.swift mac/BoardView.swift mac/EffectsView.swift mac/SoundEngine.swift mac/Theme.swift"
 DEPLOY=14.0
 
@@ -17,27 +16,27 @@ trap 'rm -rf "$TMP"' EXIT
 
 UNIVERSAL_OK=0
 if swiftc -O -whole-module-optimization -target "arm64-apple-macosx$DEPLOY" \
-    -o "$TMP/saolei-arm64" $SRC 2> "$TMP/arm64.log" \
+    -o "$TMP/minesweeper-arm64" $SRC 2> "$TMP/arm64.log" \
   && swiftc -O -whole-module-optimization -target "x86_64-apple-macosx$DEPLOY" \
-    -o "$TMP/saolei-x86_64" $SRC 2> "$TMP/x86_64.log"; then
+    -o "$TMP/minesweeper-x86_64" $SRC 2> "$TMP/x86_64.log"; then
   UNIVERSAL_OK=1
 else
-  # 打印失败架构的日志，便于排查
+  # Print compiler diagnostics for the failed architecture.
   cat "$TMP/arm64.log" "$TMP/x86_64.log" >&2 || true
 fi
 
 if [ "$UNIVERSAL_OK" = "1" ]; then
-  lipo -create "$TMP/saolei-arm64" "$TMP/saolei-x86_64" -output "$APP/Contents/MacOS/扫雷"
-  echo "架构: universal (arm64 + x86_64)"
+  lipo -create "$TMP/minesweeper-arm64" "$TMP/minesweeper-x86_64" -output "$APP/Contents/MacOS/Minesweeper"
+  echo "Architecture: universal (arm64 + x86_64)"
 else
-  echo "警告: 通用二进制构建失败，回退为 arm64（Intel Mac 将无法运行）" >&2
+  echo "Warning: universal build failed; falling back to arm64 (Intel Macs are not supported)." >&2
   swiftc -O -whole-module-optimization -target "arm64-apple-macosx$DEPLOY" \
-    -o "$APP/Contents/MacOS/扫雷" $SRC
-  echo "架构: arm64 only"
+    -o "$APP/Contents/MacOS/Minesweeper" $SRC
+  echo "Architecture: arm64 only"
 fi
 
 cp mac/Info.plist "$APP/Contents/Info.plist"
 cp mac/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-# 链接器的 ad-hoc 签名在 Info.plist 复制前生成，会导致 LaunchServices 拒绝启动，需重签
+# Sign again after copying Info.plist; the linker's earlier ad-hoc signature would otherwise be invalid.
 codesign --force --sign - "$APP"
-echo "构建完成: $(pwd)/$APP"
+echo "Build complete: $(pwd)/$APP"

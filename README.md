@@ -1,84 +1,90 @@
-# VOID SURVEY · 静默边界
+# VOID SURVEY
 
-一场发生在悬浮遗迹上的三维扫雷。探索金属舱盖、读取周围异常、部署能量信标。保留经典扫雷规则，重新设计场景、材质、输入和任务界面。
+A 3D Minesweeper expedition across a floating ruin. Explore metal hatches, interpret nearby hazards, and place energy beacons. Classic Minesweeper rules meet a new scene, materials, controls, and mission interface.
 
-[Changelog (English)](changelog.md)
+[Changelog](changelog.md)
 
-## 网页版
+## Browser game
 
-直接双击 `index.html` 即可运行；构建产物包含 Three.js，不需要联网下载 CDN 资源。也可以启动静态服务器：
+Open `index.html` directly to play. The bundle includes Three.js and requires no CDN downloads. You can also start a static server:
 
 ```bash
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
-打开 <http://127.0.0.1:8765>。浏览器需要 WebGL 2；不可用或显卡上下文丢失时，自动切到保持同一棋局的二维兼容界面。
+Visit <http://127.0.0.1:8765>. The 3D renderer requires WebGL 2. If WebGL is unavailable or its context is lost, the game switches to a playable 2D compatibility grid and preserves the current board.
 
-[GitHub Pages 线上入口](https://stanatny.github.io/minesweeper/)随仓库的发布配置更新；本地修改不会自动发布到线上。
+The [GitHub Pages version](https://stanatny.github.io/minesweeper/) follows the repository's deployment configuration. Local changes do not automatically update the live site.
 
-### 操作
+### Controls
 
-| 操作       | 方式                                              |
-| ---------- | ------------------------------------------------- |
-| 探索       | 左键／轻点舱盖；首击及其八邻域安全                |
-| 标记       | 右键、底部“标记”模式，或触屏长按                  |
-| 连开       | 双击已探索数字，周围信标数匹配时展开邻格          |
-| 旋转       | 拖动；俯视模式会锁定旋转                          |
-| 缩放       | 滚轮、触屏双指；中键或双指拖动平移                |
-| 键盘       | Tab 进入棋盘，方向键选择，Enter／空格探索，F 标记 |
-| 视角／重开 | V 切换俯视，R 请求重新开始；进行中的棋局会先确认  |
+| Action           | Input                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| Explore (reveal) | Left-click or tap a hatch. The first reveal and its eight neighbors are safe.                           |
+| Mark (flag)      | Right-click, select Mark mode in the bottom toolbar, or long-press on a touchscreen.                    |
+| Chord            | Double-click a revealed number to open its remaining neighbors when the adjacent flag count matches.    |
+| Orbit            | Drag the scene. Top-down view locks rotation.                                                           |
+| Zoom and pan     | Scroll or pinch to zoom. Middle-drag or drag with two fingers to pan.                                   |
+| Keyboard         | Tab into the board, use the arrow keys to select a cell, press Enter or Space to reveal, and F to flag. |
+| View and restart | Press V for top-down view or R to restart. Restarting an active round requires confirmation.            |
 
-初级 9×9／10 雷、中级 16×16／40 雷、高级 30×16／99 雷，自定义宽 5–50、高 5–30、雷数 1–宽×高−9。背景音乐与音效默认开启，首次点击或键盘操作后播放；右上角的音符与扬声器按钮可分别关闭。切换到后台时暂停音频。
+Choose Scout (beginner: 9 × 9, 10 mines), Deep (intermediate: 16 × 16, 40 mines), or Frontier (expert: 30 × 16, 99 mines). Custom boards support widths of 5–50, heights of 5–30, and 1 to width × height − 9 mines.
 
-触雷后，机械核心会先预热，再从触发位置向外逐颗爆开；每颗爆炸同步发声，留下焦黑残骸。引爆先零星、后密集，高级及更大棋盘连同收尾不超过约 4 秒（后台暂停）。连锁结束后显示结算，过程中可以重新探索，立即停止旧棋局的爆炸。
+Background music and sound effects are enabled by default and start after the first click or key press. The music-note and speaker buttons in the upper-right corner control them independently. Audio pauses while the page is hidden.
 
-### 开发与验证
+Clearing a sector launches a short fireworks celebration around the board: rising golden trails burst into cyan, gold, and violet sparks with synchronized sound. You can start another survey immediately. Fireworks stop on restart and respect the system's reduced-motion preference.
 
-需要 Node.js 22 或更高版本、npm；浏览器测试使用本机 Google Chrome。
+Triggering a mine starts a chain reaction that spreads from the impact point. Mechanical cores heat up, explode with synchronized sound, and leave charred remains. The first blasts are separate, then the sequence accelerates into a dense finale. Frontier (expert) and larger boards finish in approximately four seconds, including the effect tail; the sequence pauses while the page is hidden. Results appear after the chain ends. Restarting during the sequence immediately stops the previous round's explosions.
+
+### Development and validation
+
+Requires Node.js 22 or later and npm. Browser tests use a locally installed Google Chrome.
 
 ```bash
 npm ci
 npm run build
 npm test
-# 先在另一个终端启动上面的 8765 静态服务器
+# Start the static server on port 8765 in another terminal before browser tests.
 npm run test:browser
 npm run test:polish
 npm run test:timing
 npm run test:flames
+npm run test:fireworks
 ```
 
-修改 `js/` 后执行 `npm run build`，刷新同一页面。浏览器实际加载 `dist/explorer.js`，不是源文件；构建产物保留在仓库中以支持直接打开与静态托管。
+After editing `js/`, run `npm run build` and refresh the page. The browser loads `dist/explorer.js`, rather than the source modules. Build artifacts are checked in to support direct opening and static hosting.
 
-### 结构与素材
+### Structure and assets
 
-- `index.html`、`css/style.css`：响应式任务界面与无障碍控件。
-- `js/explorer.js`：输入、计时、难度、状态与兼容模式。
-- `js/game_engine.js`：独立扫雷状态引擎。
-- `js/survey_scene.js`：参数化三维舱盖、破碎岩柱、悬浮能源核心、轨道、信标和相机；这是可编辑的模型来源。
-- `js/cosmic_environment.js`：程序化行星、大气层、星群与尘带。
-- `js/survey_effects.js`：共用粒子池、扫描波、标记能量柱、冲击波和抛射火星拖尾。
-- `js/flame_jets.js`：实例化喷射火柱、翻卷火舌与短烟尾；密集爆炸复用固定实例池。
-- `js/mine_model.js`：实例化机械地雷、预热状态与爆炸残骸。
-- `js/detonation_sequence.js`：独立的逐雷显现与引爆时间线。
-- `js/survey_audio.js`：本地合成背景音乐、操作音与分层爆破声，无外部音频。
-- `dist/`：浏览器实际运行的离线构建与许可说明。
-- `tests/`：规则测试与真实浏览器交互验收。
-- `artifacts/`：本机验收截图，已排除版本控制。
+- `index.html`, `css/style.css`: Responsive mission interface and accessible controls.
+- `js/explorer.js`: Input, timing, difficulty, game status, and compatibility mode.
+- `js/game_engine.js`: Independent Minesweeper state engine.
+- `js/survey_scene.js`: Editable, procedural 3D models for hatches, fractured rock columns, the floating reactor, orbital rings, beacons, and the camera.
+- `js/cosmic_environment.js`: Procedural planet, atmosphere, stars, and dust.
+- `js/survey_effects.js`: Shared particle pools, scan waves, beacon columns, shockwaves, and ember trails.
+- `js/flame_jets.js`: Instanced flame jets, branching tongues, and short smoke tails, with a fixed pool for dense explosions.
+- `js/victory_fireworks.js`: Pooled victory rockets, aerial bursts, and falling spark trails.
+- `js/mine_model.js`: Instanced mechanical mines, primed states, and charred remains.
+- `js/detonation_sequence.js`: Independent mine-reveal and detonation timeline.
+- `js/survey_audio.js`: Locally synthesized music, interaction sounds, and layered explosions, with no external audio files.
+- `dist/`: Offline browser bundle and license notices.
+- `tests/`: Game-rule tests and real-browser interaction checks.
+- `artifacts/`: Local validation screenshots, excluded from version control.
 
-所有场景几何和数字纹理均由代码生成，无外部模型、照片或字体。使用 Three.js 0.186.0（MIT），完整许可见 [third_party_notices.md](third_party_notices.md)。
+All scene geometry and digit textures are generated in code. No external models, photographs, or fonts are required. Three.js 0.186.0 is distributed under the MIT license; see [third_party_notices.md](third_party_notices.md) for the complete license.
 
-## macOS 原生版本
+## Native macOS version
 
-`mac/` 中保留原有 SwiftUI 经典版本，本次三维重构作用于网页版。原生应用的视觉与发布包尚未同步为三维版本。
+`mac/` contains the classic 2D SwiftUI application. The 3D experience is available in the browser version; the native application retains its original gameplay and presentation.
 
-系统要求 macOS 14 或更高版本；从 [Releases](https://github.com/stanatny/minesweeper/releases) 下载已有版本，或运行：
+Requires macOS 14 or later. Download an existing build from [Releases](https://github.com/stanatny/minesweeper/releases), or build from source:
 
 ```bash
 chmod +x build.sh
 ./build.sh
 ```
 
-脚本优先构建 Apple Silicon 与 Intel 的通用 App，输出 `扫雷.app`。当前应用采用 ad-hoc 签名，没有 Apple Developer ID 公证。
+The script prefers a universal build for Apple Silicon and Intel Macs. It outputs `Minesweeper.app`, containing the `Minesweeper` executable. The application uses ad-hoc signing and is not notarized with an Apple Developer ID.
 
 ## License
 

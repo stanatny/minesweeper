@@ -9,7 +9,7 @@ const BROWSER_ERRORS = [];
 const CHECKS = [];
 const EXPECTED_CONTEXT_LOSS = new WeakSet();
 
-// 棋局操作经过真实输入；仅在降级测试中主动触发图形上下文丢失。
+// Use real input for gameplay; intentionally lose the WebGL context only when testing fallback behavior.
 async function snapshot(page) {
   return page.evaluate(() => {
     const test = window.__surveyTest;
@@ -70,7 +70,7 @@ function watchErrors(page, label) {
     BROWSER_ERRORS.push(`${label}: ${error.message}`);
   });
   page.on("console", (message) => {
-    // 只豁免本测试主动触发的两条标准上下文丢失提示，其他错误仍须失败。
+    // Ignore only the two standard messages caused by intentional context loss; all other errors must fail.
     if (
       EXPECTED_CONTEXT_LOSS.has(page) &&
       /^(?:THREE\.WebGLRenderer: Context Lost\.|3D rendering unavailable; accessible grid enabled\. WebGL context lost)$/.test(
@@ -218,7 +218,7 @@ try {
     "first pointer reveal clears its cursor after departure and unlocks music",
   );
 
-  // 聚焦容器只定位键盘入口，选择变更必须由真实方向键驱动。
+  // Focus the container only to enter keyboard navigation; change the selection using real arrow-key input.
   await page.locator("#scene-stage").focus();
   await page.keyboard.press("ArrowRight");
   await page.waitForFunction(() => {
@@ -277,11 +277,11 @@ try {
   });
   assert.equal(
     await page.locator("#sound-toggle").getAttribute("aria-label"),
-    "关闭音效",
+    "Mute sound effects",
   );
   assert.equal(
     await page.locator("#music-toggle").getAttribute("aria-label"),
-    "关闭背景音乐",
+    "Mute music",
   );
   passed(
     "music and sound effects toggle independently without silent preference changes",
@@ -320,7 +320,7 @@ try {
   const samples = [state.sequence];
   let sawExplosionAudio = state.audio.explosionVoices > 0;
   const deadline = Date.now() + 45000;
-  // 采样真实动画时钟，允许低帧率跳过少量状态，但不能一帧跳到全部完成。
+  // Sample the real animation clock; slow frames may skip some states but must not complete the sequence in one frame.
   while (!state.sequence.completed && Date.now() < deadline) {
     await page.waitForTimeout(110);
     state = await snapshot(page);
@@ -444,7 +444,7 @@ try {
   assert.equal(fallbackState.scene, null);
   assert.equal(fallbackState.boardParent, "fallback-board");
   assert.ok(
-    !fallbackState.statusLabel.includes("连锁引爆中"),
+    !fallbackState.statusLabel.includes("Chain reaction"),
     "Fallback must replace the interrupted chain label with the terminal game status",
   );
   assert.equal(
@@ -455,7 +455,7 @@ try {
     path: resolve(ARTIFACT_DIR, "polish_context_loss_fallback.png"),
     fullPage: true,
   });
-  // 降级不只显示棋局；重新开始后必须能通过真实按钮继续探索。
+  // Fallback must remain playable: after restarting, real button input must continue exploring the grid.
   await restart(page);
   await page.locator('#fallback-board [data-cell-id="40"]').click();
   await waitStatus(page, "playing");

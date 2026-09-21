@@ -27,14 +27,15 @@ jobs:
 
       - name: Verify app bundle
         run: |
-          codesign --verify --deep --strict --verbose=2 "扫雷.app"
-          file "扫雷.app/Contents/MacOS/扫雷"
-          lipo "扫雷.app/Contents/MacOS/扫雷" -verify_arch arm64 x86_64
+          codesign --verify --deep --strict --verbose=2 "Minesweeper.app"
+          file "Minesweeper.app/Contents/MacOS/Minesweeper"
+          lipo "Minesweeper.app/Contents/MacOS/Minesweeper" -verify_arch arm64
+          lipo "Minesweeper.app/Contents/MacOS/Minesweeper" -verify_arch x86_64
 
       - name: Package app
         run: |
           ditto -c -k --sequesterRsrc --keepParent \
-            "扫雷.app" "Minesweeper-macOS-v1.0.0.zip"
+            "Minesweeper.app" "Minesweeper-macOS-v1.0.0.zip"
           shasum -a 256 "Minesweeper-macOS-v1.0.0.zip"
 
       - name: Upload release asset

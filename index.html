@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#070d14" />
-    <title>静默边界 · VOID SURVEY</title>
+    <title>VOID SURVEY · 3D Minesweeper</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="css/style.css" />
     <script defer src="dist/explorer.js"></script>
@@ -12,7 +12,7 @@
   <body>
     <div id="app" class="expedition">
       <header class="masthead">
-        <a class="brand" href="./" aria-label="静默边界，首页"
+        <a class="brand" href="./" aria-label="VOID SURVEY home"
           ><svg
             class="brand-symbol"
             viewBox="0 0 40 44"
@@ -32,24 +32,24 @@
           ><span class="brand-name"
             >VOID<span class="brand-slash">/</span>SURVEY<span
               class="brand-caption"
-              >静默边界 · 空间扫雷</span
+              >3D MINESWEEPER</span
             ></span
           ></a
         >
         <div class="header-context" aria-hidden="true">
-          <span class="signal-dot"></span>深空遗迹勘探计划<span
+          <span class="signal-dot"></span>DEEP-SPACE EXPEDITION<span
             class="context-rule"
           ></span
           >EXPLORE THE UNSEEN
         </div>
-        <nav class="header-actions" aria-label="游戏设置">
+        <nav class="header-actions" aria-label="Game settings">
           <button
             id="sound-toggle"
             class="icon-button sound-button"
             type="button"
-            aria-label="关闭音效"
+            aria-label="Mute sound effects"
             aria-pressed="true"
-            title="关闭音效"
+            title="Mute sound effects"
           >
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
@@ -78,9 +78,9 @@
             id="music-toggle"
             class="icon-button music-button"
             type="button"
-            aria-label="关闭背景音乐"
+            aria-label="Mute music"
             aria-pressed="true"
-            title="关闭背景音乐"
+            title="Mute music"
           >
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
@@ -118,8 +118,8 @@
             id="help-btn"
             class="icon-button"
             type="button"
-            aria-label="查看操作指南"
-            title="操作指南"
+            aria-label="Open guide"
+            title="How to play"
           >
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle
@@ -142,10 +142,10 @@
             id="settings-btn"
             class="icon-button"
             type="button"
-            aria-label="探索区域设置"
+            aria-label="Survey settings"
             aria-controls="settings-panel"
             aria-expanded="true"
-            title="区域设置"
+            title="Survey settings"
           >
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
@@ -173,33 +173,31 @@
         </nav>
       </header>
       <main class="mission-layout">
-        <aside class="mission-rail" aria-label="勘探任务与状态">
+        <aside class="mission-rail" aria-label="Survey mission and status">
           <div class="mission-intro">
             <p class="eyebrow">
               <span class="tiny-cross" aria-hidden="true">+</span> THE
               EXPEDITION
             </p>
-            <h1>读懂<span>未知。</span></h1>
+            <h1>Chart the <span>unknown.</span></h1>
             <p class="mission-description">
-              一片沉睡的遗迹。<br />每一个数字，都是安全的线索。
+              A dormant relic.<br />Every number points to safety.
             </p>
           </div>
           <section
             id="settings-panel"
             class="region-settings"
-            aria-label="探索区域"
+            aria-label="Survey area"
           >
             <label class="field-label" for="preset-select"
-              >探索区域<span>SECTOR</span></label
+              >Survey area<span>SECTOR</span></label
             >
             <div class="select-wrap">
               <select id="preset-select">
-                <option value="beginner">浅层遗迹 · 9 × 9 · 10 核心</option>
-                <option value="intermediate">
-                  幽深地带 · 16 × 16 · 40 核心
-                </option>
-                <option value="expert">远域边界 · 30 × 16 · 99 核心</option>
-                <option value="custom">自定义探索区域</option></select
+                <option value="beginner">Scout · 9×9 · 10</option>
+                <option value="intermediate">Deep · 16×16 · 40</option>
+                <option value="expert">Frontier · 30×16 · 99</option>
+                <option value="custom">Custom sector</option></select
               ><svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path
                   d="m4 6 4 4 4-4"
@@ -210,7 +208,7 @@
             </div>
             <div id="custom-inputs" class="custom-inputs" hidden>
               <label for="custom-width"
-                >宽度<input
+                >Width<input
                   id="custom-width"
                   type="number"
                   min="5"
@@ -218,7 +216,7 @@
                   value="16"
                   inputmode="numeric" /></label
               ><label for="custom-height"
-                >高度<input
+                >Height<input
                   id="custom-height"
                   type="number"
                   min="5"
@@ -226,7 +224,7 @@
                   value="16"
                   inputmode="numeric" /></label
               ><label for="custom-mines"
-                >核心<input
+                >Cores<input
                   id="custom-mines"
                   type="number"
                   min="1"
@@ -234,7 +232,7 @@
                   value="40"
                   inputmode="numeric" /></label
               ><button id="apply-btn" class="text-button" type="button">
-                进入自定义区域<span aria-hidden="true">↗</span>
+                Start custom survey<span aria-hidden="true">↗</span>
               </button>
             </div>
             <p
@@ -244,19 +242,19 @@
               aria-live="polite"
             ></p>
           </section>
-          <section class="telemetry" aria-label="勘探数据">
+          <section class="telemetry" aria-label="Survey data">
             <div class="telemetry-stat">
-              <p class="field-label">剩余核心<span>CORES</span></p>
+              <p class="field-label">Cores left<span>CORES</span></p>
               <p id="mine-counter" class="stat-value">—</p>
             </div>
             <div class="telemetry-stat">
-              <p class="field-label">勘探时间<span>TIME</span></p>
+              <p class="field-label">Elapsed<span>TIME</span></p>
               <p id="timer" class="stat-value stat-time">00:00</p>
             </div>
           </section>
-          <section class="survey-progress" aria-label="探索进度">
+          <section class="survey-progress" aria-label="Survey progress">
             <div class="progress-heading">
-              <span class="field-label">安全区域</span
+              <span class="field-label">Safe tiles</span
               ><span id="progress-value">0%</span>
             </div>
             <div class="progress-track" aria-hidden="true">
@@ -266,9 +264,9 @@
           <section class="mission-status" aria-live="polite" aria-atomic="true">
             <div class="status-heading">
               <span class="signal-dot" aria-hidden="true"></span>
-              <h2 id="status-label">等待首次探索</h2>
+              <h2 id="status-label">Ready to explore</h2>
             </div>
-            <p id="status-description">选择一块遗迹，开始你的勘探。</p>
+            <p id="status-description">Choose a tile to begin your survey.</p>
           </section>
           <section
             id="result-panel"
@@ -281,34 +279,34 @@
             <h2 id="result-title"></h2>
             <p id="result-description"></p>
             <button id="result-restart" class="text-button" type="button">
-              再次探索<span aria-hidden="true">↗</span>
+              New survey<span aria-hidden="true">↗</span>
             </button>
           </section>
           <div class="rail-footnote" aria-hidden="true">
-            <span class="footnote-line"></span>未知之中，秩序始终存在。
+            <span class="footnote-line"></span>Find the pattern in the unknown.
           </div>
         </aside>
-        <section class="scene-section" aria-label="三维遗迹棋盘">
+        <section class="scene-section" aria-label="3D relic field">
           <div class="scene-topline" aria-hidden="true">
             <span><span class="tiny-cross">+</span> RELIC FIELD</span
             ><span class="scene-projection"
-              >空间探测视窗<span class="projection-mark"></span
+              >SPATIAL SCANNER<span class="projection-mark"></span
             ></span>
           </div>
           <div class="scene-viewport">
             <div
               id="scene-stage"
-              aria-label="三维扫雷棋盘；拖动旋转，滚轮缩放。也可使用键盘探索。"
+              aria-label="3D minesweeper board. Drag to orbit, scroll to zoom, or explore with the keyboard."
             ></div>
             <div
               id="fallback-board"
               class="fallback-board"
               hidden
-              aria-label="扫雷棋盘"
+              aria-label="Minesweeper board"
             ></div>
             <div id="scene-status" class="scene-status" role="status">
-              <span class="loading-orbit" aria-hidden="true"></span
-              >正在建立探测视野
+              <span class="loading-orbit" aria-hidden="true"></span>Preparing
+              the survey
             </div>
             <div class="viewport-corner corner-tl" aria-hidden="true"></div>
             <div class="viewport-corner corner-tr" aria-hidden="true"></div>
@@ -316,12 +314,14 @@
             <div class="viewport-corner corner-br" aria-hidden="true"></div>
           </div>
           <div class="scene-bottomline">
-            <span id="cell-readout">移动指针，检视遗迹</span
+            <span id="cell-readout">Point at a tile to inspect it</span
             ><span class="scene-hint"
               ><span class="desktop-hint"
-                >拖动旋转<span aria-hidden="true"> / </span>滚轮缩放</span
+                >Drag to orbit<span aria-hidden="true"> / </span>Scroll to
+                zoom</span
               ><span class="touch-hint"
-                >拖动旋转<span aria-hidden="true"> / </span>双指缩放</span
+                >Drag to orbit<span aria-hidden="true"> / </span>Pinch to
+                zoom</span
               ></span
             >
           </div>
@@ -331,10 +331,10 @@
       <footer class="control-footer">
         <div class="footer-note">
           <span class="small-diamond" aria-hidden="true"></span
-          ><span>先观察，再探索。</span>
+          ><span>Observe. Then explore.</span>
         </div>
-        <div class="control-dock" role="toolbar" aria-label="勘探操作">
-          <div class="mode-switch" role="group" aria-label="点击模式">
+        <div class="control-dock" role="toolbar" aria-label="Survey controls">
+          <div class="mode-switch" role="group" aria-label="Primary action">
             <button
               id="reveal-mode"
               class="mode-button"
@@ -354,7 +354,7 @@
                   stroke="currentColor"
                   stroke-width="1.4"
                 /></svg
-              >探索<span class="key-hint">↵</span>
+              >Explore<span class="key-hint">↵</span>
             </button>
             <button
               id="flag-mode"
@@ -369,16 +369,16 @@
                   stroke-width="1.4"
                   stroke-linejoin="round"
                 /></svg
-              >标记<span class="key-hint">F</span>
+              >Mark<span class="key-hint">F</span>
             </button>
           </div>
           <span class="dock-divider" aria-hidden="true"></span>
-          <div class="view-controls" role="group" aria-label="视角控制">
+          <div class="view-controls" role="group" aria-label="Camera controls">
             <button
               id="reset-camera"
               class="dock-button"
               type="button"
-              title="重置视角"
+              title="Reset view"
             >
               <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
                 <path
@@ -388,14 +388,14 @@
                   stroke-linecap="round"
                   stroke-linejoin="round"
                 /></svg
-              ><span>复位</span>
+              ><span>Reset</span>
             </button>
             <button
               id="top-view"
               class="dock-button"
               type="button"
               aria-pressed="false"
-              title="切换俯视视角 · V"
+              title="Toggle top view · V"
             >
               <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
                 <path
@@ -405,12 +405,12 @@
                   stroke-linecap="round"
                   stroke-linejoin="round"
                 /></svg
-              ><span>俯视</span>
+              ><span>Top view</span>
             </button>
           </div>
         </div>
         <button id="new-game" class="new-game-button" type="button">
-          <span>重新探索</span
+          <span>New survey</span
           ><svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
             <path
               d="M4 10h12m-5-5 5 5-5 5"
@@ -434,7 +434,7 @@
           class="icon-button"
           type="button"
           data-close-dialog
-          aria-label="关闭操作指南"
+          aria-label="Close guide"
         >
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
@@ -446,38 +446,48 @@
           </svg>
         </button>
       </div>
-      <h2 id="help-title">数字，是你的航标。</h2>
+      <h2 id="help-title">Let the numbers guide you.</h2>
       <p class="dialog-intro">
-        探索所有安全地块即可完成勘探。数字代表相邻八格中的危险核心数量；用信标标记你判断有危险的位置。第一次操作后播放背景音乐；音乐与音效可在右上角独立关闭。
+        Explore every safe tile to complete the survey. Each number counts
+        dangerous cores in the eight surrounding tiles. Mark the tiles you
+        suspect. Music starts after your first interaction; the top-right
+        controls let you mute music and sound effects separately.
       </p>
       <dl class="guide-list">
         <div>
-          <dt>探索 / 标记</dt>
-          <dd>点击探索；右键或长按标记。触屏也可先切换底部“标记”模式。</dd>
-        </div>
-        <div>
-          <dt>快速连开</dt>
+          <dt>Explore / Mark</dt>
           <dd>
-            周围标记数与数字一致时，双击数字，探索其余相邻地块。错误标记仍可能触发核心。
+            Click to explore. Right-click or press and hold to mark. On touch
+            screens, you can also switch to Mark in the toolbar.
           </dd>
         </div>
         <div>
-          <dt>观察遗迹</dt>
+          <dt>Open nearby tiles</dt>
           <dd>
-            拖动旋转、滚轮或双指缩放。用“俯视”看清布局，用“复位”找回初始视野。
+            When the nearby marks match a tile’s number, double-click it to
+            explore the remaining neighbors. Incorrect marks can still trigger a
+            core.
           </dd>
         </div>
         <div>
-          <dt>键盘操作</dt>
+          <dt>Look around</dt>
           <dd>
-            <kbd>方向键</kbd> 选择地块，<kbd>Enter</kbd> /
-            <kbd>Space</kbd> 探索，<kbd>F</kbd> 标记，<kbd>V</kbd>
-            切换视角，<kbd>R</kbd> 重新开始（需要确认）。
+            Drag to orbit; scroll or pinch to zoom. Use Top view to see the
+            layout, or Reset to restore the starting view.
+          </dd>
+        </div>
+        <div>
+          <dt>Keyboard controls</dt>
+          <dd>
+            <kbd>Arrow keys</kbd> select a tile; <kbd>Enter</kbd> /
+            <kbd>Space</kbd> explore; <kbd>F</kbd> marks; <kbd>V</kbd> toggles
+            top view; <kbd>R</kbd> starts a new survey, with confirmation during
+            an active round.
           </dd>
         </div>
       </dl>
       <button class="primary-button" type="button" data-close-dialog>
-        开始勘探<span aria-hidden="true">↗</span>
+        Start exploring<span aria-hidden="true">↗</span>
       </button>
     </dialog>
     <dialog
@@ -487,15 +497,15 @@
       aria-describedby="confirm-description"
     >
       <p class="eyebrow">MISSION CONTROL</p>
-      <h2 id="confirm-title">开始新的勘探？</h2>
+      <h2 id="confirm-title">Start a new survey?</h2>
       <p id="confirm-description" class="dialog-intro">
-        当前探索进度将被重置。
+        Your current survey progress will be reset.
       </p>
       <div class="dialog-actions">
         <button id="confirm-cancel" class="secondary-button" type="button">
-          继续当前勘探</button
+          Keep exploring</button
         ><button id="confirm-accept" class="primary-button" type="button">
-          重新探索
+          New survey
         </button>
       </div>
     </dialog>

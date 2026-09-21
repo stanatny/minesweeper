@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Minefield } from "../js/game_engine.js";
 
-// 固定随机源让布雷测试可重复，同时覆盖真实的首次布雷流程。
+// Seed randomness for repeatable mine-placement tests while exercising the real first-reveal flow.
 function seededRandom(seed = 1729) {
   let state = seed >>> 0;
   return () => {
@@ -11,7 +11,7 @@ function seededRandom(seed = 1729) {
   };
 }
 
-// 显式棋局用于独立验证翻开与旗标语义，不依赖随机布雷的具体排列。
+// Use explicit boards to test reveal and marking semantics independently of random mine arrangements.
 function preparedField({
   mineIds = [6, 8, 18, 22],
   revealedIds = [],

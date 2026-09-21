@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key>
-    <string>zh_CN</string>
+    <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>扫雷</string>
+    <string>Minesweeper</string>
     <key>CFBundleIdentifier</key>
     <string>com.local.saolei</string>
     <key>CFBundleName</key>
-    <string>扫雷</string>
+    <string>Minesweeper</string>
     <key>CFBundleDisplayName</key>
-    <string>扫雷</string>
+    <string>Minesweeper</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleIconFile</key>

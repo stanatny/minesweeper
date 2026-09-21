@@ -45,13 +45,13 @@ function startGame(nextConfig = config) {
   updateHUD();
   updateAccessibleBoard();
   $("timer").textContent = "00:00";
-  $("cell-readout").textContent = "选择一块舱盖，开始探索";
+  $("cell-readout").textContent = "Choose a tile to begin";
 }
 
 function act(action, id) {
   if (!Number.isInteger(id) || id < 0 || id >= model.cells.length) return;
   if (action === "flag" && model.status === "ready") {
-    toast("先探索一格，再用信标标记危险。");
+    toast("Explore a tile before marking suspected cores.");
     return;
   }
   const before = model.status;
@@ -72,9 +72,9 @@ function act(action, id) {
   if (result.action !== "lose" || !scene) audio.play(result.action);
   if (model.status !== lastStatus && ["won", "lost"].includes(model.status)) {
     if (model.status === "lost" && scene?.detonation.active) {
-      $("status-label").textContent = "连锁引爆中";
+      $("status-label").textContent = "Chain reaction";
       $("status-description").textContent =
-        "冲击正在向外传递，危险核心将依次显现。";
+        "The blast is spreading. Cores will detonate one by one.";
     } else showResult();
   }
   lastStatus = model.status;
@@ -94,32 +94,42 @@ function updateHUD() {
     String(progress),
   );
   const text = {
-    ready: ["等待首次扫描", "点击任意舱盖。第一次探索及周围区域保证安全。"],
-    playing: ["勘探进行中", "数字表示周围八格的危险数量。用信标标记可疑区域。"],
-    won: ["区域勘探完成", "全部安全舱盖已探索，所有危险已被封存。"],
-    lost: ["发现不稳定核心", "本次探索结束。查看危险分布，准备下一次出发。"],
+    ready: [
+      "Ready to explore",
+      "Choose any tile. Your first move and its neighbors are safe.",
+    ],
+    playing: [
+      "Survey in progress",
+      "Numbers count cores in the eight neighboring tiles. Mark suspected cores.",
+    ],
+    won: ["Sector cleared", "All safe tiles explored. Every core is marked."],
+    lost: [
+      "Core triggered",
+      "Review the revealed cores, then start a new survey.",
+    ],
   }[model.status];
   $("status-label").textContent = text[0];
   $("status-description").textContent = text[1];
   document.body.dataset.gameState = model.status;
   if ($("sector-size"))
     $("sector-size").textContent = `${model.width} × ${model.height}`;
-  if ($("sector-mines"))
-    $("sector-mines").textContent = `${model.mines} 处异常`;
+  if ($("sector-mines")) $("sector-mines").textContent = `${model.mines} cores`;
 }
 
 function showResult() {
   const won = model.status === "won";
   $("result-title").textContent = won
-    ? "静默，重新归来。"
-    : "有些秘密，仍需谨慎。";
+    ? "Silence restored."
+    : "Survey interrupted.";
   $("result-description").textContent = won
-    ? `用时 ${formatTime(elapsed)}，成功探索全部 ${model.revealedCount} 块安全舱盖。`
-    : `用时 ${formatTime(elapsed)}，已探索 ${model.revealedCount} 块安全舱盖。核心位置现已显现。`;
+    ? `All ${model.revealedCount} safe tiles explored in ${formatTime(elapsed)}.`
+    : `${model.revealedCount} safe tiles explored in ${formatTime(elapsed)}. All core locations are now visible.`;
   $("result-panel").hidden = false;
   $("result-panel").dataset.outcome = model.status;
   toast(
-    won ? "勘探完成 · 所有安全区域已解锁" : "触发危险核心 · 可以查看完整分布",
+    won
+      ? "Survey complete · all safe tiles explored"
+      : "Core triggered · full layout revealed",
   );
 }
 
@@ -135,20 +145,20 @@ function updateReadout(id) {
   if (id < 0 || !model?.cells[id]) {
     $("cell-readout").textContent =
       model?.status === "ready"
-        ? "选择一块舱盖，开始探索"
-        : "拖动旋转 · 滚轮缩放";
+        ? "Choose a tile to begin"
+        : "Drag to orbit · Scroll to zoom";
     return;
   }
   const cell = model.snapshot().cells[id];
   const label = cell.revealed
     ? cell.mine
-      ? "危险核心"
+      ? "Unstable core"
       : cell.adjacent
-        ? `${cell.adjacent} 个相邻危险`
-        : "安全区域"
+        ? `${cell.adjacent} nearby core${cell.adjacent === 1 ? "" : "s"}`
+        : "Safe tile"
     : cell.flagged
-      ? "已部署信标"
-      : "尚未探索";
+      ? "Marked"
+      : "Unexplored";
   $("cell-readout").textContent =
     `${String(cell.x + 1).padStart(2, "0")} : ${String(cell.y + 1).padStart(2, "0")} / ${label}`;
 }
@@ -159,7 +169,7 @@ function buildAccessibleBoard() {
   board.setAttribute("role", "grid");
   board.setAttribute(
     "aria-label",
-    "遗迹扫雷棋盘，使用方向键选择，回车探索，F 标记",
+    "Minesweeper grid. Use the arrow keys to select a tile, Enter to explore, and F to mark.",
   );
   board.setAttribute("aria-rowcount", String(model.height));
   board.setAttribute("aria-colcount", String(model.width));
@@ -197,17 +207,17 @@ function updateAccessibleBoard(changed = model.cells.map((cell) => cell.id)) {
     const cell = snapshot.cells[id];
     const button = cellButtons[id];
     const description = cell.wrongFlag
-      ? "错误信标"
+      ? "Incorrect mark"
       : cell.revealed
         ? cell.mine
-          ? "危险核心"
-          : `${cell.adjacent} 个相邻危险`
+          ? "Unstable core"
+          : `${cell.adjacent} nearby core${cell.adjacent === 1 ? "" : "s"}`
         : cell.flagged
-          ? "已标记"
-          : "尚未探索";
+          ? "Marked"
+          : "Unexplored";
     button.setAttribute(
       "aria-label",
-      `第 ${cell.y + 1} 行第 ${cell.x + 1} 列，${description}`,
+      `Row ${cell.y + 1}, column ${cell.x + 1}: ${description}`,
     );
     button.dataset.state = cell.wrongFlag
       ? "wrong"
@@ -252,8 +262,7 @@ function enableFallback(error) {
   $("fallback-board").hidden = false;
   $("fallback-board").appendChild($("board-accessibility"));
   $("board-accessibility").classList.remove("sr-only");
-  $("scene-status").textContent =
-    "兼容模式 · 当前设备无法渲染 3D，仍可完整探索";
+  $("scene-status").textContent = "3D unavailable · The grid is ready to play.";
   $("scene-status").hidden = false;
   $("reset-camera").disabled = true;
   $("top-view").disabled = true;
@@ -275,7 +284,7 @@ function toast(message) {
 function confirmReset(description) {
   if (model.status !== "playing") return Promise.resolve(true);
   if (pendingConfirmation) return Promise.resolve(false);
-  $("confirm-title").textContent = "离开当前探索？";
+  $("confirm-title").textContent = "Start a new survey?";
   $("confirm-description").textContent = description;
   $("confirm-dialog").showModal();
   return new Promise((resolve) => {
@@ -291,14 +300,15 @@ function finishConfirmation(value) {
 }
 
 async function restart() {
-  if (await confirmReset("重新出发将清空当前棋局、信标与计时。")) startGame();
+  if (await confirmReset("This will reset the board, marks, and timer."))
+    startGame();
 }
 
 function formatTime(seconds) {
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-// 固定验收页面的布局种子，让前后截图和触控回归可复现；正常游戏使用系统随机数。
+// Use a fixed layout seed for repeatable screenshots and input tests; normal games use system randomness.
 function testRandom() {
   let seed = 7127;
   return () => {
@@ -307,7 +317,7 @@ function testRandom() {
   };
 }
 
-// 仅真实操作后解锁声音；指针模式不保留键盘选中框。
+// Unlock audio after real input and clear keyboard focus when using a pointer.
 document.addEventListener(
   "pointerdown",
   () => {
@@ -338,11 +348,13 @@ $("sound-toggle").addEventListener("click", () => {
   $("sound-toggle").setAttribute("aria-pressed", String(enabled));
   $("sound-toggle").setAttribute(
     "aria-label",
-    enabled ? "关闭音效" : "开启音效",
+    enabled ? "Mute sound effects" : "Unmute sound effects",
   );
-  $("sound-toggle").title = enabled ? "关闭音效" : "开启音效";
+  $("sound-toggle").title = enabled
+    ? "Mute sound effects"
+    : "Unmute sound effects";
   const label = $("sound-toggle").querySelector("[data-sound-label]");
-  if (label) label.textContent = enabled ? "音效开启" : "音效关闭";
+  if (label) label.textContent = enabled ? "Sound on" : "Sound off";
   audio.setEnabled(enabled);
   audio.play("flag");
 });
@@ -351,9 +363,9 @@ $("music-toggle").addEventListener("click", () => {
   $("music-toggle").setAttribute("aria-pressed", String(enabled));
   $("music-toggle").setAttribute(
     "aria-label",
-    enabled ? "关闭背景音乐" : "开启背景音乐",
+    enabled ? "Mute music" : "Unmute music",
   );
-  $("music-toggle").title = enabled ? "关闭背景音乐" : "开启背景音乐";
+  $("music-toggle").title = enabled ? "Mute music" : "Unmute music";
   audio.setMusicEnabled(enabled);
 });
 $("help-btn").addEventListener("click", () => $("help-dialog").showModal());
@@ -379,7 +391,7 @@ $("preset-select").addEventListener("change", async () => {
   $("custom-inputs").hidden = nextPreset !== "custom";
   $("config-error").textContent = "";
   if (nextPreset === "custom") return;
-  if (await confirmReset("切换探索区域将开始一局新的勘探。")) {
+  if (await confirmReset("Changing sectors will reset your current survey.")) {
     activePreset = nextPreset;
     startGame(PRESETS[nextPreset]);
   } else {
@@ -400,7 +412,11 @@ $("apply-btn").addEventListener("click", async () => {
     return;
   }
   $("config-error").textContent = "";
-  if (await confirmReset("应用新的参数将结束当前勘探。")) {
+  if (
+    await confirmReset(
+      "Applying these settings will reset your current survey.",
+    )
+  ) {
     activePreset = "custom";
     startGame(custom);
   }
@@ -410,7 +426,7 @@ stage.tabIndex = 0;
 stage.setAttribute("role", "group");
 stage.setAttribute(
   "aria-label",
-  "三维扫雷场景；方向键选择，回车探索，F 标记，V 切换俯视",
+  "3D minesweeper board. Arrow keys select; Enter explores; F marks; V toggles top view.",
 );
 stage.addEventListener("focus", () => {
   if (stage.matches(":focus-visible")) scene?.focus(focusId);
@@ -482,6 +498,8 @@ try {
     onHover: updateReadout,
     onFailure: enableFallback,
     onExplosion: (event) => audio.playExplosion(event),
+    onFirework: (phase, event) => audio.playFirework(phase, event),
+    onFireworksStop: () => audio.stopFireworks(),
     onChainComplete: () => {
       if (model.status !== "lost") return;
       updateHUD();
@@ -500,7 +518,7 @@ setInterval(() => {
   $("timer").textContent = formatTime(elapsed);
 }, 250);
 
-// 本机验收入口只对本地 test=1 页面开放；正式页面不暴露隐藏棋局。
+// Expose test hooks only on local test=1 pages; public pages never expose the hidden board.
 if (isLocalTest) {
   window.__surveyTest = {
     getGame: () => model,

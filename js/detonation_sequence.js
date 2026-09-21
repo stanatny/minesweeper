@@ -1,4 +1,4 @@
-// 将已结束棋局的地雷按空间距离逐个显现、预热和爆炸；不修改规则引擎的状态。
+// Reveal, prime, and detonate mines outward from the impact point without changing the rules engine.
 export class DetonationSequence {
   constructor() {
     this.reset();
@@ -13,7 +13,7 @@ export class DetonationSequence {
     this.duration = 0;
   }
 
-  // start 接收失败后的公开快照；先处理实际踩中的雷，再向外传播。
+  // start accepts the public snapshot after a loss, beginning with the triggered mine and spreading outward.
   start(snapshot) {
     this.reset();
     if (snapshot.status !== "lost") return;
@@ -28,7 +28,7 @@ export class DetonationSequence {
           Math.hypot(b.x - origin.x, b.y - origin.y) || a.id - b.id
       );
     });
-    // 前三颗清晰分开，随后按缓出曲线压缩间隔；再多的雷也在约四秒内收尾。
+    // Separate the first three blasts, then shorten intervals along an ease-out curve to finish within about four seconds.
     const openingCount = Math.min(3, mines.length);
     const remaining = mines.length - openingCount;
     const openingEnd = 0.12 + (openingCount - 1) * 0.28;
@@ -56,10 +56,10 @@ export class DetonationSequence {
     this.active = true;
   }
 
-  // advance 返回本帧新显现与爆炸事件，声音和三维粒子共用同一时间轴。
+  // advance returns newly revealed mines and explosions so audio and 3D particles share one timeline.
   advance(delta) {
     if (!this.active) return { revealed: [], explosions: [], finished: false };
-    // 使用实际可见时长；偶发慢帧不应把高级模式的连锁拖长。
+    // Use elapsed time while the page is visible so occasional slow frames do not prolong expert-mode detonations.
     this.time += Math.max(0, Number.isFinite(delta) ? delta : 0);
     const revealed = [],
       explosions = [];

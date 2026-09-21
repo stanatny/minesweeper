@@ -8,7 +8,7 @@ const ARTIFACT_DIR = resolve("artifacts");
 const BROWSER_ERRORS = [];
 const MAX_WALL_MS = 5500;
 
-// 调试入口仅用于读取隐藏棋局与动画状态，选难度、探索、触雷均经过真实界面。
+// Test hooks only inspect hidden board data and animation state; difficulty selection, reveals, and losses use real UI input.
 async function clickCell(page, id) {
   const point = await page.evaluate(
     (cellId) => window.__surveyTest.getScene().projectCell(cellId),
@@ -53,7 +53,7 @@ try {
     return game.width === 30 && game.height === 16 && game.mines === 99;
   });
   await page.locator("#scene-stage canvas").waitFor({ state: "visible" });
-  // 给首次高级棋盘的材质编译和相机布局一个稳定窗口，不改动动画时钟。
+  // Allow the expert board to compile materials and settle its camera without changing the animation clock.
   await page.waitForTimeout(450);
   await clickCell(page, 255);
   await page.waitForFunction(
@@ -69,7 +69,7 @@ try {
   });
   assert.ok(Number.isInteger(mineId), "Expert mode must contain a hidden mine");
 
-  // 与渲染帧同步采样真实墙钟，避免 Node 轮询或截图耗时影响爆炸密度统计。
+  // Sample wall time in render frames so Node polling and screenshots cannot skew blast-density measurements.
   await page.evaluate(() => {
     const probe = {
       samples: [],
@@ -132,7 +132,7 @@ try {
   const firstAllFired = samples.find((sample) => sample.fired === 99);
   assert.ok(firstAllFired, "All 99 mines must finish detonating");
 
-  // 每颗雷的可见爆炸时刻取首次观察到 fired 增加的渲染帧，允许密集段同帧多颗。
+  // Record each blast at the first frame that increases the fired count; dense bursts may share a frame.
   const observedBlasts = [];
   let previousFired = 0;
   for (const sample of samples) {

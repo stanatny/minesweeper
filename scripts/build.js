@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 import { copyFile } from "node:fs/promises";
 
-// 构建可直接打开的浏览器包，并随产物分发依赖的完整许可。
+// Build a browser bundle that opens directly and include the complete dependency license.
 await build({
   entryPoints: ["js/explorer.js"],
   bundle: true,
