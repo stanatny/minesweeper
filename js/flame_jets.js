@@ -16,6 +16,11 @@ export class FlameJets {
     this.disposed = false;
     this.serial = 0;
     this.matrix = new THREE.Matrix4();
+    this.origin = new THREE.Vector3();
+    this.normal = new THREE.Vector3();
+    this.up = new THREE.Vector3(0, 1, 0);
+    this.rotation = new THREE.Quaternion();
+    this.scaleVector = new THREE.Vector3();
 
     // Each blast has three flame tongues and a ground ring; both shapes share one material and draw call.
     const fireGeometry = new THREE.PlaneGeometry(1, 1, 4, 12);
@@ -77,10 +82,24 @@ export class FlameJets {
   }
 
   // trigger starts a jet at the given 3D position, replacing the oldest smoke trail when the pool is full without adding objects.
-  trigger({ x, y = 0.48, z }) {
+  trigger({ x, y = 0.48, z, normal = [0, 1, 0], scale = 1 }) {
     if (this.disposed) return;
     if (![x, y, z].every(Number.isFinite))
       throw new TypeError("Flame coordinates must be finite");
+    if (
+      !Array.isArray(normal) ||
+      normal.length !== 3 ||
+      !normal.every(Number.isFinite)
+    )
+      throw new TypeError("Flame normal must contain three finite coordinates");
+    if (!Number.isFinite(scale) || scale <= 0)
+      throw new RangeError("Flame scale must be positive and finite");
+    this.normal.fromArray(normal);
+    if (this.normal.lengthSq() < 1e-12)
+      throw new RangeError("Flame normal must be nonzero");
+    this.normal.normalize();
+    this.rotation.setFromUnitVectors(this.up, this.normal);
+    this.scaleVector.setScalar(scale);
     let index = this.slots.findIndex((slot) => !slot.active);
     if (index < 0) {
       index = this.slots.reduce(
@@ -116,9 +135,13 @@ export class FlameJets {
         0,
         central || ground ? 0 : Math.sin(sideAngle) * 0.54,
       );
-      this.matrix.makeTranslation(x, y + (ground ? -0.1 : 0), z);
+      this.origin
+        .set(x, y, z)
+        .addScaledVector(this.normal, ground ? -0.1 * scale : 0);
+      this.matrix.compose(this.origin, this.rotation, this.scaleVector);
       this.fire.setMatrixAt(instance, this.matrix);
-      this.matrix.makeTranslation(x, y + 0.1, z);
+      this.origin.set(x, y, z).addScaledVector(this.normal, 0.1 * scale);
+      this.matrix.compose(this.origin, this.rotation, this.scaleVector);
       this.smoke.setMatrixAt(instance, this.matrix);
       this.smokeParameters.setXYZW(
         instance,
@@ -214,18 +237,23 @@ const FIRE_VERTEX = `
     vGround = jetParameters.y < 0.0 ? 1.0 : 0.0;
     if (vAge < 0.0 || vAge > 0.74) { gl_Position = vec4(2, 2, 2, 1); return; }
     vec3 origin = (modelMatrix * instanceMatrix * vec4(0, 0, 0, 1)).xyz;
+    mat3 basis = mat3(modelMatrix * instanceMatrix);
+    float scale = length(basis[1]);
+    vec3 axis = normalize(basis[1]);
     vec3 right = normalize(vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]));
+    vec3 lateral = right - axis * dot(right, axis);
+    right = length(lateral) > 0.01 ? normalize(lateral) : normalize(basis[0]);
     vec3 world;
     if (vGround > 0.5) {
       float radius = jetParameters.z * (0.3 + min(vAge / 0.36, 1.0) * 0.75);
-      world = origin + vec3(position.x * radius, 0.012, (position.y - 0.5) * radius);
+      world = origin + basis * vec3(position.x * radius, 0.012, (position.y - 0.5) * radius);
     } else {
       float rise = 0.65 + 0.35 * smoothstep(0.0, 0.15, vAge);
       float lift = max(0.0, vAge - 0.24) * 0.42;
       float bend = sin(uv.y * 5.7 - vAge * 16.0 + vSeed) * 0.065 * uv.y;
-      world = origin + vec3(0, uv.y * jetParameters.y * rise + lift, 0);
-      world += right * (position.x * jetParameters.z + bend);
-      world += jetDirection * uv.y * uv.y;
+      world = origin + basis * vec3(0, uv.y * jetParameters.y * rise + lift, 0);
+      world += right * (position.x * jetParameters.z + bend) * scale;
+      world += basis * jetDirection * uv.y * uv.y;
     }
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
@@ -281,11 +309,13 @@ const SMOKE_VERTEX = `
     vProgress = (smokeParameters.x - smokeParameters.y) / smokeParameters.w;
     if (smokeParameters.x < 0.0 || vProgress < 0.0 || vProgress > 1.0) { gl_Position = vec4(2, 2, 2, 1); return; }
     vec3 origin = (modelMatrix * instanceMatrix * vec4(0, 0, 0, 1)).xyz;
+    mat3 basis = mat3(modelMatrix * instanceMatrix);
+    float scale = length(basis[1]);
     vec3 right = normalize(vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]));
     vec3 up = normalize(vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]));
     float size = 0.26 + vProgress * 0.63;
     vec3 drift = vec3(sin(vSeed) * 0.18, 0.52 + vProgress * 1.18, cos(vSeed) * 0.18);
-    vec3 world = origin + drift + (right * position.x + up * position.y) * size;
+    vec3 world = origin + basis * drift + (right * position.x + up * position.y) * size * scale;
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
 `;

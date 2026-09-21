@@ -4,12 +4,24 @@
 
 ### Added
 
+- Optional faceted-solid minefields with Corner cut, Terraces, and Cube generators, 96–864 equal square tiles, independently adjustable area and corner cuts, and configurable core density.
+- Actual edge-and-corner adjacency across a closed stepped body, with first-move protection, flood reveal, chording, neighbor highlighting, back-face exploration, and a six-direction compatibility atlas.
+- Surface-oriented mine models and flame jets, detonation ordering by distance along neighboring tiles, and the existing victory celebration on 3D objects.
 - A victory fireworks sequence with rising golden trails, colorful aerial bursts, and synchronized sound effects. Celebration effects respect reduced motion and stop immediately when a new survey begins.
 
 ### Changed
 
+- Faceted solids use uniform square metal plates and numbers fixed to their face orientation, including inside corners.
+
 - Balanced the reactor lighting with a soft cyan glow and visible crystal facets, reducing glare while keeping the scene luminous.
 - Switched repository documentation, interface copy, and source comments to English, and standardized native build names as `Minesweeper.app` and `Minesweeper`.
+
+### Fixed
+
+- Keep the first rows of tall compatibility atlases reachable when the board overflows its viewport.
+- Release post-processing resources before disposing the renderer when switching field types.
+- Keep the Top view button synchronized after regeneration and focus the visible field selector when opening settings.
+- Keep fireworks on schedule during slow frames by consuming visible time in bounded physics steps.
 
 ## 2.0.0 — 2026-09-21
 

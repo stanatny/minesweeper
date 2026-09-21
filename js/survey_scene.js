@@ -1048,9 +1048,9 @@ export class SurveyScene {
     this.mines?.dispose();
     this.disposeGroup(this.scene);
     this.textures.forEach((texture) => texture.dispose());
-    this.renderer.dispose();
-    this.bloom.dispose();
+    this.composer.passes.forEach((pass) => pass.dispose());
     this.composer.dispose();
+    this.renderer.dispose();
     this.renderer.domElement.remove();
   }
 }

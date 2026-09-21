@@ -1,6 +1,6 @@
 # VOID SURVEY
 
-A 3D Minesweeper expedition across a floating ruin. Explore metal hatches, interpret nearby hazards, and place energy beacons. Classic Minesweeper rules meet a new scene, materials, controls, and mission interface.
+A 3D Minesweeper expedition across a floating ruin or a stepped solid. Explore metal hatches, interpret nearby hazards, and place energy beacons. Classic Minesweeper rules extend across sharp-edged 3D forms with equally sized square tiles and numbers printed on each face.
 
 [Changelog](changelog.md)
 
@@ -18,17 +18,39 @@ The [GitHub Pages version](https://stanatny.github.io/minesweeper/) follows the 
 
 ### Controls
 
-| Action           | Input                                                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------------------------- |
-| Explore (reveal) | Left-click or tap a hatch. The first reveal and its eight neighbors are safe.                           |
-| Mark (flag)      | Right-click, select Mark mode in the bottom toolbar, or long-press on a touchscreen.                    |
-| Chord            | Double-click a revealed number to open its remaining neighbors when the adjacent flag count matches.    |
-| Orbit            | Drag the scene. Top-down view locks rotation.                                                           |
-| Zoom and pan     | Scroll or pinch to zoom. Middle-drag or drag with two fingers to pan.                                   |
-| Keyboard         | Tab into the board, use the arrow keys to select a cell, press Enter or Space to reveal, and F to flag. |
-| View and restart | Press V for top-down view or R to restart. Restarting an active round requires confirmation.            |
+| Action           | Input                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Explore (reveal) | Left-click or tap a hatch. The first reveal and all its neighbors are safe.                                              |
+| Mark (flag)      | Right-click, select Mark mode in the bottom toolbar, or long-press on a touchscreen.                                     |
+| Chord            | Double-click a revealed number to open its remaining neighbors when the adjacent flag count matches.                     |
+| Orbit            | Drag the scene. Top-down view locks rotation on planar boards; faceted solids always allow orbiting.                     |
+| Zoom and pan     | Scroll or pinch to zoom. Middle-drag or drag with two fingers to pan on planar boards; two fingers orbit faceted solids. |
+| Keyboard         | Tab into the board, use the arrow keys to select a cell, press Enter or Space to reveal, and F to flag.                  |
+| View and restart | Press V for top-down view or R to restart. Restarting an active round requires confirmation.                             |
 
 Choose Scout (beginner: 9 × 9, 10 mines), Deep (intermediate: 16 × 16, 40 mines), or Frontier (expert: 30 × 16, 99 mines). Custom boards support widths of 5–50, heights of 5–30, and 1 to width × height − 9 mines.
+
+### Faceted solid mode
+
+Use **Field type → Faceted solid** to play across an entire closed 3D object. Drag to orbit freely and reach the back, top, underside, and recessed steps. Every tile is the same physical size: a unit square on a flat face. Numbers follow the orientation of their face instead of floating toward the camera.
+
+Open **Shape generator** to prepare a new field:
+
+- **Corner cut** creates a block with a stepped recess. **Terraces** creates successive setbacks. **Cube** keeps a regular cubic silhouette.
+- **Surface area** selects 96–864 playable tiles. Each tile has an area of one square unit, so this changes the actual area without stretching individual squares.
+- **Corner cuts** changes the depth and arrangement of integer-sized steps while preserving the total area and tile count. This control is disabled for the regular Cube. Increasing cuts changes the shape in discrete steps.
+- **Core density** sets the proportion of mines from 8% to 25%.
+- **Generate new solid** applies the settings with a new shape seed. Changes remain a draft until applied; replacing an active survey requires confirmation. **New survey** keeps the shape and starts a fresh mine layout.
+
+Tiles sharing an edge or corner are neighbors, including across convex ridges and recessed corners. The number of neighbors can vary at those corners. Hovering or keyboard-focusing a tile highlights its actual neighborhood. Numbers, first-move protection, flood reveal, and chording all use these same connections. Shape changes can alter the adjacency graph, so they are only applied when generating a new field.
+
+Arrow keys follow adjacent tiles in the current viewing direction, and keyboard focus turns a hidden face into view. Top view is a camera preset; rotation remains available. Mines, beacons, and flame jets follow their supporting face.
+
+The generator cuts whole blocks from a cubic volume to create one closed orthogonal body. The cuts preserve surface area, and all exposed faces are tiled with equal squares. Shape seeds are displayed beneath the generator. If WebGL becomes unavailable, the same game continues in a six-direction atlas with the original cross-face adjacency and accessible neighbor labels. The atlas groups tiles by the direction they face, including separate terraces at different depths.
+
+The generator collapses after the first reveal to make room for the survey status; reopen it to prepare another shape.
+
+### Effects and audio
 
 Background music and sound effects are enabled by default and start after the first click or key press. The music-note and speaker buttons in the upper-right corner control them independently. Audio pauses while the page is hidden.
 
@@ -50,6 +72,7 @@ npm run test:polish
 npm run test:timing
 npm run test:flames
 npm run test:fireworks
+npm run test:surface
 ```
 
 After editing `js/`, run `npm run build` and refresh the page. The browser loads `dist/explorer.js`, rather than the source modules. Build artifacts are checked in to support direct opening and static hosting.
@@ -59,6 +82,8 @@ After editing `js/`, run `npm run build` and refresh the page. The browser loads
 - `index.html`, `css/style.css`: Responsive mission interface and accessible controls.
 - `js/explorer.js`: Input, timing, difficulty, game status, and compatibility mode.
 - `js/game_engine.js`: Independent Minesweeper state engine.
+- `js/surface_topology.js`: Deterministic stepped solids, unit-square tiles, shared-corner adjacency, and independently controlled area and corner cuts.
+- `js/surface_scene.js`: Equal square plates, face-aligned numbers, full-object orbiting, occlusion-aware picking, neighbor highlighting, and face-oriented mines and flame jets.
 - `js/survey_scene.js`: Editable, procedural 3D models for hatches, fractured rock columns, the floating reactor, orbital rings, beacons, and the camera.
 - `js/cosmic_environment.js`: Procedural planet, atmosphere, stars, and dust.
 - `js/survey_effects.js`: Shared particle pools, scan waves, beacon columns, shockwaves, and ember trails.

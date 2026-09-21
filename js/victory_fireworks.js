@@ -194,7 +194,7 @@ export class VictoryFireworks {
   /**
    * Advance only while the host scene is visible.
    * @param {number} delta Seconds since the previous visible frame.
-   * @returns {void} Pauses catch-up beyond 80 ms so stalls cannot bunch the show.
+   * @returns {void} Consumes visible time in stable steps, bounded by the remaining show duration.
    */
   update(delta) {
     if (this.disposed || !this.active) return;
@@ -203,7 +203,21 @@ export class VictoryFireworks {
       return;
     }
     if (!Number.isFinite(delta) || delta <= 0) return;
-    const step = Math.min(delta, 0.08);
+    const targetTime = Math.min(this.duration, this.elapsed + delta);
+    // Preserve wall-clock timing without taking unstable physics steps or processing time after the show.
+    while (this.elapsed < targetTime) {
+      this.advance(Math.min(targetTime - this.elapsed, 0.08));
+    }
+    this.syncBuffers();
+    if (
+      this.elapsed >= this.duration ||
+      (this.nextLaunch === this.rockets.length && this.activeCount === 0)
+    ) {
+      this.finish();
+    }
+  }
+
+  advance(step) {
     this.elapsed += step;
     for (const particle of this.particles) {
       if (particle.life <= 0 || particle.kind === 2) continue;
@@ -257,19 +271,12 @@ export class VictoryFireworks {
       }
       if (progress === 1) this.burst(rocket);
     }
-    // Even after a long frame, only one pending launch may begin per update.
+    // The substep is shorter than the closest launch interval, preserving the nine-rocket sequence.
     if (
       this.nextLaunch < this.rockets.length &&
       this.elapsed >= LAUNCH_TIMES[this.nextLaunch]
     ) {
       this.launch(this.rockets[this.nextLaunch++]);
-    }
-    this.syncBuffers();
-    if (
-      this.elapsed >= this.duration ||
-      (this.nextLaunch === this.rockets.length && this.activeCount === 0)
-    ) {
-      this.finish();
     }
   }
 

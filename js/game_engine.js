@@ -5,7 +5,7 @@
 export class Minefield {
   /**
    * Create a board that is ready to start.
-   * @param {object} options Board width, height, mine count, and an optional random number generator.
+   * @param {object} options Grid dimensions or surface topology, mine count, and optional randomness.
    * @returns {Minefield} An unseeded board that reserves a safe neighborhood on the first reveal.
    */
   constructor({
@@ -13,17 +13,34 @@ export class Minefield {
     height = 9,
     mines = 10,
     random = Math.random,
+    topology = null,
   } = {}) {
-    if (!Number.isInteger(width) || width < 5 || width > 50) {
-      throw new RangeError("Width must be an integer between 5 and 50");
-    }
-    if (!Number.isInteger(height) || height < 5 || height > 30) {
-      throw new RangeError("Height must be an integer between 5 and 30");
-    }
-    if (!Number.isInteger(mines) || mines < 1 || mines > width * height - 9) {
-      throw new RangeError(
-        "Mines must be an integer between 1 and width * height - 9",
+    this.topology = topology === null ? null : prepareTopology(topology);
+    if (this.topology) {
+      width = this.topology.width;
+      height = this.topology.height;
+      this.#adjacency = this.topology.cells.map((cell) => cell.neighbors);
+      const maxDegree = Math.max(
+        ...this.#adjacency.map((neighbors) => neighbors.length),
       );
+      const maxMines = this.topology.cellCount - maxDegree - 1;
+      if (!Number.isInteger(mines) || mines < 1 || mines > maxMines) {
+        throw new RangeError(
+          `Mines must be an integer between 1 and ${maxMines}`,
+        );
+      }
+    } else {
+      if (!Number.isInteger(width) || width < 5 || width > 50) {
+        throw new RangeError("Width must be an integer between 5 and 50");
+      }
+      if (!Number.isInteger(height) || height < 5 || height > 30) {
+        throw new RangeError("Height must be an integer between 5 and 30");
+      }
+      if (!Number.isInteger(mines) || mines < 1 || mines > width * height - 9) {
+        throw new RangeError(
+          "Mines must be an integer between 1 and width * height - 9",
+        );
+      }
     }
     if (typeof random !== "function") {
       throw new TypeError("Random must be a function");
@@ -38,8 +55,15 @@ export class Minefield {
     this.#random = random;
     this.cells = Array.from({ length: width * height }, (_, id) => ({
       id,
-      x: id % width,
-      y: Math.floor(id / width),
+      x: this.topology ? this.topology.cells[id].x : id % width,
+      y: this.topology ? this.topology.cells[id].y : Math.floor(id / width),
+      ...(this.topology
+        ? {
+            face: this.topology.cells[id].face,
+            u: this.topology.cells[id].u,
+            v: this.topology.cells[id].v,
+          }
+        : {}),
       mine: false,
       revealed: false,
       flagged: false,
@@ -50,7 +74,7 @@ export class Minefield {
   }
 
   /**
-   * Reveal a cell and expand empty regions; the first reveal and its eight neighbors are mine-free.
+   * Reveal a cell and expand empty regions; the first reveal and every neighbor are mine-free.
    * @param {number} id Zero-based cell index in row-major order.
    * @returns {object} Changed cell IDs, the game status, and the resulting action.
    */
@@ -117,12 +141,13 @@ export class Minefield {
   }
 
   /**
-   * Return valid neighbors in all eight directions, ordered from top to bottom and left to right.
+   * Return grid neighbors in reading order, or the surface's shared edge and corner neighbors.
    * @param {number} id Cell index; invalid indices do not change the board.
    * @returns {number[]} Neighbor indices, or an empty array for an invalid index.
    */
   neighbors(id) {
     if (!this.#isValidId(id)) return [];
+    if (this.#adjacency) return [...this.#adjacency[id]];
     const { x, y } = this.cells[id];
     const nearby = [];
     for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
@@ -145,7 +170,7 @@ export class Minefield {
 
   /**
    * Create a detached snapshot for the interface and accessibility text.
-   * @returns {object} Copies of the game and cells; covered cells have null mine and adjacent values.
+   * @returns {object} Copied game cells and frozen geometry; covered cells have null mine and adjacent values.
    */
   snapshot() {
     return {
@@ -155,6 +180,7 @@ export class Minefield {
       status: this.status,
       revealedCount: this.revealedCount,
       flagCount: this.flagCount,
+      topology: this.topology,
       cells: this.cells.map((cell) => ({
         ...cell,
         mine: cell.revealed ? cell.mine : null,
@@ -168,6 +194,7 @@ export class Minefield {
    ********************************************/
 
   #random;
+  #adjacency = null;
 
   #isValidId(id) {
     return Number.isInteger(id) && id >= 0 && id < this.cells.length;
@@ -268,4 +295,137 @@ export class Minefield {
     }
     return true;
   }
+}
+
+// Whitelist and freeze geometry separately from mutable game state so snapshots cannot expose answers.
+function prepareTopology(topology) {
+  if (
+    !topology ||
+    topology.kind !== "surface" ||
+    !Array.isArray(topology.cells) ||
+    !Number.isInteger(topology.width) ||
+    topology.width < 1 ||
+    !Number.isInteger(topology.height) ||
+    topology.height < 1 ||
+    topology.cells.length !== topology.width * topology.height ||
+    topology.cellCount !== topology.cells.length
+  ) {
+    throw new TypeError("Topology must contain a valid surface cell map");
+  }
+  const cells = topology.cells.map((cell, id) => {
+    if (
+      !cell ||
+      cell.id !== id ||
+      !Number.isInteger(cell.x) ||
+      !Number.isInteger(cell.y) ||
+      cell.x < 0 ||
+      cell.x >= topology.width ||
+      cell.y < 0 ||
+      cell.y >= topology.height ||
+      !Array.isArray(cell.neighbors) ||
+      cell.neighbors.length === 0 ||
+      new Set(cell.neighbors).size !== cell.neighbors.length ||
+      cell.neighbors.some(
+        (neighbor) =>
+          !Number.isInteger(neighbor) ||
+          neighbor < 0 ||
+          neighbor >= topology.cells.length ||
+          neighbor === id,
+      )
+    ) {
+      throw new TypeError(
+        "Topology cells must have sequential IDs and valid unique neighbors",
+      );
+    }
+    const result = { id, x: cell.x, y: cell.y, neighbors: [...cell.neighbors] };
+    for (const key of ["face", "u", "v", "patchSize"]) {
+      if (cell[key] === undefined) continue;
+      if (!Number.isInteger(cell[key]) || cell[key] < 0) {
+        throw new TypeError(
+          "Topology coordinates and patch sizes must be nonnegative integers",
+        );
+      }
+      result[key] = cell[key];
+    }
+    for (const key of ["center", "normal"]) {
+      if (cell[key] !== undefined) result[key] = copyVector(cell[key]);
+    }
+    for (const key of ["corners", "patch"]) {
+      if (cell[key] === undefined) continue;
+      if (!Array.isArray(cell[key])) {
+        throw new TypeError(
+          "Topology geometry must contain arrays of finite vectors",
+        );
+      }
+      result[key] = cell[key].map(copyVector);
+    }
+    return result;
+  });
+  for (const cell of cells) {
+    for (const neighbor of cell.neighbors) {
+      if (!cells[neighbor].neighbors.includes(cell.id)) {
+        throw new TypeError("Topology neighbors must be symmetric");
+      }
+    }
+  }
+  const reached = new Set([0]);
+  const pending = [0];
+  for (let index = 0; index < pending.length; index += 1) {
+    for (const neighbor of cells[pending[index]].neighbors) {
+      if (reached.has(neighbor)) continue;
+      reached.add(neighbor);
+      pending.push(neighbor);
+    }
+  }
+  if (reached.size !== cells.length) {
+    throw new TypeError("Topology must form one connected surface");
+  }
+  const result = {
+    kind: "surface",
+    width: topology.width,
+    height: topology.height,
+    cellCount: cells.length,
+    cells,
+  };
+  for (const key of [
+    "resolution",
+    "seed",
+    "irregularity",
+    "radius",
+    "surfaceArea",
+    "patchSize",
+    "maxDegree",
+  ]) {
+    if (topology[key] === undefined) continue;
+    if (!Number.isFinite(topology[key])) {
+      throw new TypeError("Topology metadata must contain finite numbers");
+    }
+    result[key] = topology[key];
+  }
+  if (typeof topology.shape === "string") result.shape = topology.shape;
+  if (topology.viewDirection !== undefined) {
+    result.viewDirection = copyVector(topology.viewDirection);
+  }
+  return freezeGeometry(result);
+}
+
+function copyVector(vector) {
+  if (
+    !Array.isArray(vector) ||
+    vector.length !== 3 ||
+    !vector.every(Number.isFinite)
+  ) {
+    throw new TypeError(
+      "Topology positions and normals must be finite 3D vectors",
+    );
+  }
+  return [...vector];
+}
+
+function freezeGeometry(value) {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) freezeGeometry(child);
+    Object.freeze(value);
+  }
+  return value;
 }

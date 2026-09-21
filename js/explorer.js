@@ -1,12 +1,15 @@
 import { Minefield } from "./game_engine.js";
 import { SurveyScene } from "./survey_scene.js";
 import { SurveyAudio } from "./survey_audio.js";
+import { SurfaceScene } from "./surface_scene.js";
+import { createSurface } from "./surface_topology.js";
 
 const PRESETS = {
   beginner: { width: 9, height: 9, mines: 10 },
   intermediate: { width: 16, height: 16, mines: 40 },
   expert: { width: 30, height: 16, mines: 99 },
 };
+const FACE_NAMES = ["Right", "Left", "Up", "Down", "Front", "Back"];
 const $ = (id) => document.getElementById(id);
 const isLocalTest =
   ["localhost", "127.0.0.1"].includes(location.hostname) &&
@@ -16,6 +19,11 @@ const stage = $("scene-stage");
 let model;
 let scene;
 let config = PRESETS.beginner;
+let planeConfig = PRESETS.beginner;
+let surfaceConfig = null;
+let surfaceSeed = 14863;
+let sceneInitialized = false;
+let sceneKind = "plane";
 let activePreset = "beginner";
 let mode = "reveal";
 let focusId = 0;
@@ -39,13 +47,123 @@ function startGame(nextConfig = config) {
   startedAt = 0;
   lastStatus = "ready";
   setMode("reveal");
+  syncWorldControls();
   buildAccessibleBoard();
-  scene?.rebuild(model.snapshot());
+  const nextKind = model.topology ? "surface" : "plane";
+  if (sceneInitialized && nextKind !== sceneKind) mountScene();
+  else scene?.rebuild(model.snapshot());
+  $("top-view").setAttribute("aria-pressed", String(scene?.topView ?? false));
   $("result-panel").hidden = true;
   updateHUD();
   updateAccessibleBoard();
   $("timer").textContent = "00:00";
   $("cell-readout").textContent = "Choose a tile to begin";
+}
+
+function syncWorldControls() {
+  const surface = Boolean(model.topology);
+  document.body.dataset.boardMode = surface ? "surface" : "plane";
+  $("board-mode").value = surface ? "surface" : "plane";
+  $("plane-settings").hidden = surface;
+  $("surface-settings").hidden = !surface;
+  const topology = model.topology;
+  $("surface-current").textContent = surface
+    ? `${topology.cellCount} tiles · ${model.mines} cores · Seed ${topology.seed}`
+    : "";
+  $("surface-summary").textContent = surface
+    ? `${topology.cellCount} equal tiles · ${Math.round(topology.irregularity * 100)}% cuts`
+    : "216 equal tiles · 45% cuts";
+  document.querySelector(".mission-intro h1").innerHTML = surface
+    ? "Every face.<span>One solid puzzle.</span>"
+    : "Chart the <span>unknown.</span>";
+  document.querySelector(".mission-description").innerHTML = surface
+    ? "Read the edges.<br />Find the safe path around every corner."
+    : "A dormant relic.<br />Every number points to safety.";
+  stage.setAttribute(
+    "aria-label",
+    surface
+      ? "Faceted minesweeper solid. Drag to orbit every side. Arrow keys follow neighboring tiles; Enter explores; F marks."
+      : "3D minesweeper board. Arrow keys select; Enter explores; F marks; V toggles top view.",
+  );
+}
+
+function mountScene() {
+  sceneInitialized = true;
+  scene?.dispose();
+  scene = null;
+  fallback = false;
+  sceneKind = model.topology ? "surface" : "plane";
+  stage.classList.remove("fallback-active");
+  $("fallback-board").hidden = true;
+  const board = $("board-accessibility");
+  document.querySelector(".scene-section").appendChild(board);
+  board.classList.add("sr-only");
+  $("reset-camera").disabled = false;
+  $("top-view").disabled = false;
+  try {
+    const Scene = model.topology ? SurfaceScene : SurveyScene;
+    scene = new Scene(stage, {
+      onReveal: (id) => act("reveal", id),
+      onFlag: (id) => act("flag", id),
+      onChord: (id) => act("chord", id),
+      onHover: updateReadout,
+      onFailure: enableFallback,
+      onExplosion: (event) => audio.playExplosion(event),
+      onFirework: (phase, event) => audio.playFirework(phase, event),
+      onFireworksStop: () => audio.stopFireworks(),
+      onChainComplete: () => {
+        if (model.status !== "lost") return;
+        updateHUD();
+        showResult();
+      },
+    });
+    scene.rebuild(model.snapshot());
+    scene.setMode(mode);
+    $("scene-status").hidden = true;
+  } catch (error) {
+    enableFallback(error);
+  }
+}
+
+function surfaceDraft() {
+  const shape = $("surface-shape").value;
+  return {
+    shape,
+    resolution: Number($("surface-area").value),
+    irregularity:
+      shape === "cube" ? 0 : Number($("surface-irregularity").value) / 100,
+    density: Number($("surface-density").value),
+  };
+}
+
+function updateSurfaceDraft() {
+  const draft = surfaceDraft();
+  const count = 6 * draft.resolution ** 2;
+  $("surface-area-value").textContent = `${count} tiles`;
+  $("surface-area").setAttribute("aria-valuetext", `${count} tiles`);
+  $("surface-irregularity-value").textContent =
+    draft.shape === "cube" ? "Off" : `${Math.round(draft.irregularity * 100)}%`;
+  $("surface-irregularity").disabled = draft.shape === "cube";
+  $("surface-relief-hint").textContent =
+    draft.shape === "cube"
+      ? "A regular cube has no corner cuts."
+      : "Deeper steps. Equal square tiles.";
+  $("surface-density-value").textContent =
+    `${draft.density}% · ${Math.floor((count * draft.density) / 100)} cores`;
+  $("surface-draft-note").textContent =
+    "Generate to apply these settings. Your current field stays unchanged.";
+}
+
+function generateSurfaceConfig() {
+  const draft = surfaceDraft();
+  const seed = isLocalTest
+    ? ++surfaceSeed
+    : crypto.getRandomValues(new Uint32Array(1))[0];
+  const topology = createSurface({ ...draft, seed });
+  return {
+    topology,
+    mines: Math.floor((topology.cellCount * draft.density) / 100),
+  };
 }
 
 function act(action, id) {
@@ -62,7 +180,10 @@ function act(action, id) {
         ? model.chord(id)
         : model.reveal(id);
   if (result.action === "noop") return;
-  if (before === "ready") startedAt = performance.now();
+  if (before === "ready") {
+    startedAt = performance.now();
+    if (model.topology) $("surface-generator").open = false;
+  }
   elapsed = Math.min(999, Math.floor((performance.now() - startedAt) / 1000));
   scene?.update(model.snapshot(), result);
   updateHUD();
@@ -85,7 +206,7 @@ function updateHUD() {
     model.mines - model.flagCount,
   ).padStart(2, "0");
   const progress = Math.round(
-    (model.revealedCount / (model.width * model.height - model.mines)) * 100,
+    (model.revealedCount / (model.cells.length - model.mines)) * 100,
   );
   $("progress-value").textContent = `${progress}%`;
   $("progress-fill").style.width = `${progress}%`;
@@ -108,11 +229,19 @@ function updateHUD() {
       "Review the revealed cores, then start a new survey.",
     ],
   }[model.status];
+  if (model.topology && model.status === "playing")
+    text[1] =
+      "Numbers count touching tiles across the surface. Rotate to explore every side.";
+  if (model.topology && model.status === "ready")
+    text[1] =
+      "Choose any tile. Hover to see its neighbors; drag to explore every side.";
   $("status-label").textContent = text[0];
   $("status-description").textContent = text[1];
   document.body.dataset.gameState = model.status;
   if ($("sector-size"))
-    $("sector-size").textContent = `${model.width} × ${model.height}`;
+    $("sector-size").textContent = model.topology
+      ? `${model.cells.length} surface tiles`
+      : `${model.width} × ${model.height}`;
   if ($("sector-mines")) $("sector-mines").textContent = `${model.mines} cores`;
 }
 
@@ -159,8 +288,9 @@ function updateReadout(id) {
     : cell.flagged
       ? "Marked"
       : "Unexplored";
-  $("cell-readout").textContent =
-    `${String(cell.x + 1).padStart(2, "0")} : ${String(cell.y + 1).padStart(2, "0")} / ${label}`;
+  $("cell-readout").textContent = model.topology
+    ? `Tile ${cell.id + 1} / ${label} · ${model.neighbors(id).length} neighbors`
+    : `${String(cell.x + 1).padStart(2, "0")} : ${String(cell.y + 1).padStart(2, "0")} / ${label}`;
 }
 
 function buildAccessibleBoard() {
@@ -169,13 +299,22 @@ function buildAccessibleBoard() {
   board.setAttribute("role", "grid");
   board.setAttribute(
     "aria-label",
-    "Minesweeper grid. Use the arrow keys to select a tile, Enter to explore, and F to mark.",
+    model.topology
+      ? "Faceted minesweeper solid. Arrow keys follow touching tiles across faces. Enter explores and F marks."
+      : "Minesweeper grid. Use the arrow keys to select a tile, Enter to explore, and F to mark.",
   );
   board.setAttribute("aria-rowcount", String(model.height));
   board.setAttribute("aria-colcount", String(model.width));
   board.style.setProperty("--columns", model.width);
   cellButtons = [];
   for (let y = 0; y < model.height; y++) {
+    if (model.topology && y % model.topology.resolution === 0) {
+      const heading = document.createElement("div");
+      heading.className = "surface-face-label";
+      heading.setAttribute("role", "presentation");
+      heading.textContent = `${FACE_NAMES[Math.floor(y / model.topology.resolution)]}-facing tiles`;
+      board.appendChild(heading);
+    }
     const row = document.createElement("div");
     row.setAttribute("role", "row");
     for (let x = 0; x < model.width; x++) {
@@ -184,6 +323,8 @@ function buildAccessibleBoard() {
       button.type = "button";
       button.dataset.cellId = String(id);
       button.setAttribute("role", "gridcell");
+      if (model.topology)
+        button.dataset.face = String(model.topology.cells[id].face);
       button.setAttribute("aria-rowindex", String(y + 1));
       button.setAttribute("aria-colindex", String(x + 1));
       button.tabIndex = id === focusId ? 0 : -1;
@@ -217,7 +358,12 @@ function updateAccessibleBoard(changed = model.cells.map((cell) => cell.id)) {
           : "Unexplored";
     button.setAttribute(
       "aria-label",
-      `Row ${cell.y + 1}, column ${cell.x + 1}: ${description}`,
+      model.topology
+        ? `${FACE_NAMES[cell.face]}-facing tile ${cell.id + 1}: ${description}. Neighbors ${model
+            .neighbors(id)
+            .map((neighbor) => neighbor + 1)
+            .join(", ")}.`
+        : `Row ${cell.y + 1}, column ${cell.x + 1}: ${description}`,
     );
     button.dataset.state = cell.wrongFlag
       ? "wrong"
@@ -246,7 +392,65 @@ function selectCell(id, focus = true) {
   cellButtons[focusId].tabIndex = 0;
   scene?.focus(focusId);
   updateReadout(focusId);
-  if (focus) cellButtons[focusId].focus({ preventScroll: true });
+  if (model.topology) {
+    const nearby = new Set(model.neighbors(focusId));
+    for (const button of cellButtons)
+      button.dataset.neighbor = String(
+        nearby.has(Number(button.dataset.cellId)),
+      );
+  }
+  if (focus) cellButtons[focusId].focus({ preventScroll: !fallback });
+}
+
+// Navigate the surface graph in the direction seen on screen, including across face seams.
+function surfaceNeighbor(id, key) {
+  const direction = {
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+  }[key];
+  const topology = model.topology;
+  const cell = topology.cells[id];
+  const origin = scene?.projectCell(id);
+  const tangent = (corner) =>
+    corner.map((value, axis) => value - cell.corners[0][axis]);
+  const u = tangent(cell.corners[1]);
+  const v = tangent(cell.corners[3]);
+  const unit = (vector) => {
+    const size = Math.hypot(...vector) || 1;
+    return vector.map((value) => value / size);
+  };
+  const uAxis = unit(u),
+    vAxis = unit(v);
+  const dot = (a, b) =>
+    a.reduce((sum, value, axis) => sum + value * b[axis], 0);
+  let best = id,
+    bestScore = -Infinity;
+  for (const neighbor of model.neighbors(id)) {
+    let dx, dy;
+    if (scene && origin) {
+      const projected = scene.projectCell(neighbor);
+      dx = projected.x - origin.x;
+      dy = projected.y - origin.y;
+    } else {
+      const offset = topology.cells[neighbor].center.map(
+        (value, axis) => value - cell.center[axis],
+      );
+      dx = dot(offset, uAxis);
+      dy = dot(offset, vAxis);
+    }
+    const distance = Math.hypot(dx, dy);
+    if (!distance) continue;
+    const forward = dx * direction[0] + dy * direction[1];
+    if (forward <= 0) continue;
+    const score = forward / distance - distance * 0.0001;
+    if (score > bestScore) {
+      best = neighbor;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 function enableFallback(error) {
@@ -263,6 +467,9 @@ function enableFallback(error) {
   $("fallback-board").appendChild($("board-accessibility"));
   $("board-accessibility").classList.remove("sr-only");
   $("scene-status").textContent = "3D unavailable · The grid is ready to play.";
+  if (model?.topology)
+    $("scene-status").textContent =
+      "3D unavailable · Direction atlas enabled. Neighbors still connect across faces.";
   $("scene-status").hidden = false;
   $("reset-camera").disabled = true;
   $("top-view").disabled = true;
@@ -384,7 +591,7 @@ $("settings-btn").addEventListener("click", () => {
   const panel = $("settings-panel");
   panel.hidden = !panel.hidden;
   $("settings-btn").setAttribute("aria-expanded", String(!panel.hidden));
-  if (!panel.hidden) $("preset-select").focus();
+  if (!panel.hidden) $("board-mode").focus();
 });
 $("preset-select").addEventListener("change", async () => {
   const nextPreset = $("preset-select").value;
@@ -393,7 +600,8 @@ $("preset-select").addEventListener("change", async () => {
   if (nextPreset === "custom") return;
   if (await confirmReset("Changing sectors will reset your current survey.")) {
     activePreset = nextPreset;
-    startGame(PRESETS[nextPreset]);
+    planeConfig = PRESETS[nextPreset];
+    startGame(planeConfig);
   } else {
     $("preset-select").value = activePreset;
     $("custom-inputs").hidden = activePreset !== "custom";
@@ -418,7 +626,59 @@ $("apply-btn").addEventListener("click", async () => {
     )
   ) {
     activePreset = "custom";
-    startGame(custom);
+    planeConfig = custom;
+    startGame(planeConfig);
+  }
+});
+
+$("surface-generator").open = matchMedia("(min-width: 761px)").matches;
+for (const id of [
+  "surface-shape",
+  "surface-area",
+  "surface-irregularity",
+  "surface-density",
+])
+  $(id).addEventListener("input", updateSurfaceDraft);
+$("board-mode").addEventListener("change", async () => {
+  const requested = $("board-mode").value;
+  const current = model.topology ? "surface" : "plane";
+  if (requested === current) return;
+  if (
+    !(await confirmReset("Changing the field type will start a new survey."))
+  ) {
+    $("board-mode").value = current;
+    return;
+  }
+  try {
+    if (requested === "surface") {
+      surfaceConfig ||= generateSurfaceConfig();
+      startGame(surfaceConfig);
+    } else startGame(planeConfig);
+  } catch (error) {
+    $("board-mode").value = current;
+    $("config-error").textContent = error.message;
+    toast(error.message);
+  }
+});
+$("surface-generate").addEventListener("click", async () => {
+  if (
+    !(await confirmReset(
+      "Generating a new solid will reset this survey, marks, and timer.",
+    ))
+  )
+    return;
+  try {
+    const next = generateSurfaceConfig();
+    new Minefield(next);
+    $("surface-error").textContent = "";
+    surfaceConfig = next;
+    startGame(surfaceConfig);
+    $("surface-draft-note").textContent =
+      "New solid ready. Equal squares on every face.";
+    if (matchMedia("(max-width: 760px)").matches)
+      $("surface-generator").open = false;
+  } catch (error) {
+    $("surface-error").textContent = error.message;
   }
 });
 
@@ -453,6 +713,10 @@ document.addEventListener("keydown", (event) => {
     ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)
   ) {
     event.preventDefault();
+    if (model.topology) {
+      selectCell(surfaceNeighbor(focusId, event.key));
+      return;
+    }
     const x = focusId % model.width,
       y = Math.floor(focusId / model.width);
     const nx = Math.max(
@@ -490,27 +754,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 startGame();
-try {
-  scene = new SurveyScene(stage, {
-    onReveal: (id) => act("reveal", id),
-    onFlag: (id) => act("flag", id),
-    onChord: (id) => act("chord", id),
-    onHover: updateReadout,
-    onFailure: enableFallback,
-    onExplosion: (event) => audio.playExplosion(event),
-    onFirework: (phase, event) => audio.playFirework(phase, event),
-    onFireworksStop: () => audio.stopFireworks(),
-    onChainComplete: () => {
-      if (model.status !== "lost") return;
-      updateHUD();
-      showResult();
-    },
-  });
-  scene.rebuild(model.snapshot());
-  $("scene-status").hidden = true;
-} catch (error) {
-  enableFallback(error);
-}
+mountScene();
 
 setInterval(() => {
   if (model.status === "playing")

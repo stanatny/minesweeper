@@ -831,11 +831,12 @@ kbd {
   overflow: auto;
   padding: 16px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 .fallback-board #board-accessibility {
   width: max-content;
   min-width: 100%;
+  margin-block: auto;
 }
 .fallback-board [role="row"] {
   display: grid;
@@ -1495,5 +1496,223 @@ kbd {
   }
   .brand {
     gap: 5px;
+  }
+}
+
+/* Surface generation is a separate draft; the active survey remains visible until it is applied. */
+.mode-field {
+  margin-bottom: 18px;
+}
+#surface-generator {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+}
+#surface-generator > summary {
+  cursor: pointer;
+  padding: 13px 0;
+  color: var(--ink);
+  font-size: 11px;
+  list-style-position: inside;
+}
+#surface-summary {
+  display: block;
+  margin: 5px 0 0 15px;
+  color: var(--quiet);
+  font-family: var(--font-data);
+  font-size: 9px;
+}
+.surface-generator-fields {
+  padding: 3px 0 0;
+}
+.surface-generator-fields .select-wrap {
+  margin-top: 7px;
+}
+.surface-range {
+  margin-top: 16px;
+}
+.surface-range label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.surface-range output {
+  color: var(--ice);
+  font-family: var(--font-data);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.surface-range input {
+  display: block;
+  width: 100%;
+  height: 25px;
+  margin: 4px 0 0;
+  accent-color: var(--ice);
+  cursor: pointer;
+}
+.surface-range input:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.surface-range p,
+.range-extents,
+.generator-note,
+.surface-current {
+  color: var(--quiet);
+  font-size: 10px;
+  line-height: 1.65;
+}
+.range-extents {
+  display: flex;
+  justify-content: space-between;
+}
+#surface-generate {
+  margin-top: 12px;
+}
+.generator-note {
+  margin-top: 5px;
+}
+.surface-current {
+  margin-top: 11px;
+  font-family: var(--font-data);
+  font-size: 9px;
+}
+body[data-board-mode="surface"] .mission-intro h1 {
+  font-size: 30px;
+  letter-spacing: -0.7px;
+}
+body[data-board-mode="surface"] .mission-description {
+  display: none;
+}
+body[data-board-mode="surface"] .region-settings {
+  margin-top: 20px;
+}
+.surface-face-label {
+  padding: 8px 0;
+  color: var(--ice);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.fallback-board [data-neighbor="true"] {
+  box-shadow: inset 0 0 0 1px var(--ice);
+}
+@media (max-width: 760px) {
+  .region-settings {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .mode-field {
+    margin-bottom: 0;
+    min-width: 0;
+  }
+  #plane-settings {
+    min-width: 0;
+  }
+  #surface-settings {
+    grid-column: 1 / -1;
+  }
+  #surface-generator {
+    margin-top: 0;
+  }
+  #surface-generator > summary {
+    padding: 10px 0;
+  }
+  #surface-summary {
+    display: inline;
+    margin-left: 12px;
+  }
+  .surface-generator-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 20px;
+  }
+  .surface-generator-fields > .field-label,
+  .surface-generator-fields > .select-wrap,
+  #surface-generate,
+  .generator-note,
+  #surface-error {
+    grid-column: 1 / -1;
+  }
+  .surface-range {
+    min-width: 0;
+    margin-top: 10px;
+  }
+  .surface-range:first-of-type {
+    grid-column: 1 / -1;
+  }
+  .surface-range label {
+    flex-wrap: wrap;
+    gap: 0 6px;
+  }
+  .surface-range input {
+    height: 30px;
+  }
+  .surface-current {
+    margin-top: 3px;
+  }
+  .telemetry {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  .telemetry-stat {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .telemetry .stat-value,
+  .telemetry .stat-time {
+    margin: 0;
+    font-size: 21px;
+    line-height: 1.4;
+  }
+  body[data-board-mode="surface"] .region-settings {
+    margin-top: 0;
+  }
+  body[data-board-mode="surface"] .mode-field {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Keep the complete object and camera controls visible while the generator rail can scroll. */
+@media (min-width: 761px) {
+  body[data-board-mode="surface"] .expedition {
+    height: 100svh;
+    grid-template-rows: 90px minmax(0, 1fr) 90px;
+  }
+  body[data-board-mode="surface"] .mission-layout {
+    min-height: 0;
+  }
+  body[data-board-mode="surface"] .mission-rail {
+    min-height: 0;
+    padding: 22px 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  body[data-board-mode="surface"] .scene-section {
+    min-height: 0;
+    grid-template-rows: 45px minmax(0, 1fr) 40px;
+  }
+  body[data-board-mode="surface"] .scene-viewport {
+    min-height: 0;
+  }
+  body[data-board-mode="surface"] .mission-intro h1 {
+    font-size: 25px;
+    margin-top: 10px;
+  }
+  body[data-board-mode="surface"] .region-settings {
+    margin-top: 20px;
+  }
+  body[data-board-mode="surface"] .telemetry {
+    margin-top: 20px;
+  }
+  body[data-board-mode="surface"] .mission-status {
+    margin-top: 16px;
+    padding-top: 14px;
   }
 }

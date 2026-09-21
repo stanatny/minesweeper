@@ -1,6 +1,6 @@
 // MineModels batches visible mechanical mines; callers supply only items the player is allowed to see.
 // constructor accepts the host Three.js module and the maximum mine capacity.
-// update accepts an array of { id, x, z, y = 0.35, stage, progress }; dispose releases all GPU resources.
+// update accepts { id, x, z, y = 0.35, stage, progress, normal?, scale? }; the default normal is +Y and scale is 1.
 export class MineModels {
   constructor(THREE, capacity) {
     if (!Number.isInteger(capacity) || capacity < 1) {
@@ -14,6 +14,13 @@ export class MineModels {
     this.direction = new THREE.Vector3();
     this.up = new THREE.Vector3(0, 1, 0);
     this.color = new THREE.Color();
+    this.itemTransform = new THREE.Matrix4();
+    this.itemTranslation = new THREE.Matrix4();
+    this.outputMatrix = new THREE.Matrix4();
+    this.itemOrigin = new THREE.Vector3();
+    this.itemNormal = new THREE.Vector3();
+    this.itemScale = new THREE.Vector3();
+    this.itemRotation = new THREE.Quaternion();
     this.disposed = false;
 
     const armor = new THREE.MeshStandardMaterial({
@@ -116,6 +123,35 @@ export class MineModels {
         throw new TypeError("Mine coordinates must be finite");
       if (!["armed", "primed", "spent"].includes(stage))
         throw new RangeError("Unknown mine stage");
+      const normal = item.normal ?? [0, 1, 0];
+      const scale = item.scale ?? 1;
+      if (
+        !Array.isArray(normal) ||
+        normal.length !== 3 ||
+        !normal.every(Number.isFinite)
+      )
+        throw new TypeError(
+          "Mine normal must contain three finite coordinates",
+        );
+      if (!Number.isFinite(scale) || scale <= 0)
+        throw new RangeError("Mine scale must be positive and finite");
+      this.itemNormal.fromArray(normal);
+      if (this.itemNormal.lengthSq() < 1e-12)
+        throw new RangeError("Mine normal must be nonzero");
+      this.itemRotation.setFromUnitVectors(
+        this.up,
+        this.itemNormal.normalize(),
+      );
+      this.itemOrigin.set(x, y, z);
+      this.itemScale.setScalar(scale);
+      this.itemTransform.compose(
+        this.itemOrigin,
+        this.itemRotation,
+        this.itemScale,
+      );
+      this.itemTransform.multiply(
+        this.itemTranslation.makeTranslation(-x, -y, -z),
+      );
       const progress = Number.isFinite(item.progress)
         ? Math.max(0, Math.min(1, item.progress))
         : 0;
@@ -295,6 +331,8 @@ export class MineModels {
     if (!keepRotation) this.dummy.rotation.set(0, 0, 0);
     this.dummy.scale.set(sx, sy, sz);
     this.dummy.updateMatrix();
-    mesh.setMatrixAt(index, this.dummy.matrix);
+    // Rotate and scale every part around this mine's center, preserving the original local design.
+    this.outputMatrix.multiplyMatrices(this.itemTransform, this.dummy.matrix);
+    mesh.setMatrixAt(index, this.outputMatrix);
   }
 }

@@ -232,6 +232,10 @@ export function createCosmicEnvironment(THREE) {
   let disposed = false;
   return {
     group,
+    setPlanetVisible(visible) {
+      planet.visible = Boolean(visible);
+      atmosphere.visible = Boolean(visible);
+    },
     // time is in seconds; reduced motion freezes movement while preserving the lighting and backdrop.
     update(time, reducedMotion = false) {
       if (disposed) return;
