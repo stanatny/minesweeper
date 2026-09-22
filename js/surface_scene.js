@@ -4,14 +4,19 @@ import { MineModels } from "./mine_model.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
 const COLORS = {
-  closed: new THREE.Color("#3a4c5c"),
-  open: new THREE.Color("#14323a"),
-  flagged: new THREE.Color("#494239"),
-  mine: new THREE.Color("#59362d"),
-  neighbor: new THREE.Color("#4d737c"),
-  selected: new THREE.Color("#73898a"),
-  edge: new THREE.Color("#71818b"),
-  side: new THREE.Color("#17232d"),
+  closed: new THREE.Color("#b87b51"),
+  open: new THREE.Color("#6b4734"),
+  flagged: new THREE.Color("#28434a"),
+  mine: new THREE.Color("#95483a"),
+  neighbor: new THREE.Color("#d3ad82"),
+  selected: new THREE.Color("#e7bd82"),
+  openNeighbor: new THREE.Color("#7b5640"),
+  openSelected: new THREE.Color("#8b674b"),
+  flaggedNeighbor: new THREE.Color("#34555b"),
+  flaggedSelected: new THREE.Color("#43636a"),
+  edge: new THREE.Color("#987756"),
+  openEdge: new THREE.Color("#9b7760"),
+  side: new THREE.Color("#553c2e"),
 };
 
 /**
@@ -29,8 +34,6 @@ export class SurfaceScene extends SurveyScene {
     this.controls.maxZoom = 4;
     this.controls.rotateSpeed = 0.7;
     this.surfaceView = true;
-    // Keep the playable solid distinct from distant scenery during unrestricted orbiting.
-    this.cosmos.setPlanetVisible(false);
     this.highlightedIds = [];
     this.activeCellId = -1;
     this.renderer.toneMappingExposure = 1.2;
@@ -180,7 +183,7 @@ export class SurfaceScene extends SurveyScene {
     this.colliders = new THREE.Mesh(
       bodyGeometry,
       new THREE.MeshStandardMaterial({
-        color: "#101a22",
+        color: "#322c2a",
         roughness: 0.88,
         metalness: 0.25,
         flatShading: true,
@@ -232,7 +235,7 @@ export class SurfaceScene extends SurveyScene {
     this.selectionOutline = new THREE.Mesh(
       new THREE.ShapeGeometry(outline),
       new THREE.MeshBasicMaterial({
-        color: "#d7b77c",
+        color: "#ffe0a6",
         depthTest: true,
         toneMapped: false,
       }),
@@ -349,8 +352,25 @@ export class SurfaceScene extends SurveyScene {
           ? COLORS.flagged
           : COLORS.closed;
       faceColor.copy(base);
-      if (cell.id === selected) faceColor.lerp(COLORS.selected, 0.28);
-      else if (neighbors.has(cell.id)) faceColor.lerp(COLORS.neighbor, 0.3);
+      const openSafe = cell.revealed && !cell.mine;
+      if (cell.id === selected)
+        faceColor.lerp(
+          openSafe
+            ? COLORS.openSelected
+            : cell.flagged
+              ? COLORS.flaggedSelected
+              : COLORS.selected,
+          0.28,
+        );
+      else if (neighbors.has(cell.id))
+        faceColor.lerp(
+          openSafe
+            ? COLORS.openNeighbor
+            : cell.flagged
+              ? COLORS.flaggedNeighbor
+              : COLORS.neighbor,
+          0.3,
+        );
       faceColor.multiplyScalar(
         0.97 + hash(cell.id + (Number(this.topology.seed) || 1)) * 0.06,
       );
@@ -381,7 +401,13 @@ export class SurfaceScene extends SurveyScene {
           positions.setXYZ(i, point.x, point.y, point.z);
         }
         vertexColor.copy(
-          role === 0 ? faceColor : role === 1 ? COLORS.edge : COLORS.side,
+          role === 0
+            ? faceColor
+            : role === 1
+              ? openSafe
+                ? COLORS.openEdge
+                : COLORS.edge
+              : COLORS.side,
         );
         if (role === 1 && neighbors.has(cell.id))
           vertexColor.lerp(COLORS.selected, 0.2);
@@ -735,22 +761,10 @@ function digitTexture(value) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 128;
   const context = canvas.getContext("2d");
-  context.font = `600 ${value > 9 ? 72 : 100}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+  context.font = `700 ${value > 9 ? 72 : 100}px ui-monospace, SFMono-Regular, Menlo, monospace`;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.shadowColor = "#07151d";
-  context.shadowBlur = 1;
-  context.fillStyle =
-    [
-      "#b9ecec",
-      "#b6dbb9",
-      "#f4cd9a",
-      "#c8c3f1",
-      "#efaea7",
-      "#9bd5dd",
-      "#e5d7b7",
-      "#f0ebe3",
-    ][value - 1] || "#d8d6c7";
+  context.fillStyle = "#fff4db";
   context.fillText(String(value), 64, 69);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;

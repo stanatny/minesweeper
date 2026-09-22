@@ -11,11 +11,13 @@ import { DetonationSequence } from "./detonation_sequence.js";
 import { VictoryFireworks } from "./victory_fireworks.js";
 
 const PALETTE = {
-  closed: new THREE.Color("#344352"),
-  open: new THREE.Color("#11363e"),
-  hover: new THREE.Color("#8ab7c2"),
-  flagged: new THREE.Color("#666050"),
-  danger: new THREE.Color("#82453a"),
+  closed: new THREE.Color("#b87b51"),
+  open: new THREE.Color("#6b4734"),
+  hover: new THREE.Color("#cd986a"),
+  openHover: new THREE.Color("#805b43"),
+  flagged: new THREE.Color("#28434a"),
+  flaggedHover: new THREE.Color("#36555b"),
+  danger: new THREE.Color("#95483a"),
 };
 
 // SurveyScene renders public game snapshots as an orbitable ruin and reports the cell hit by input.
@@ -109,7 +111,6 @@ export class SurveyScene {
     this.textures = [];
     this.lastTime = 0;
     this.setupLighting();
-    this.setupEnvironment();
     this.cosmos = createCosmicEnvironment(THREE);
     this.scene.add(this.cosmos.group);
     this.effects = new SurveyEffects(THREE, this.scene, {
@@ -156,8 +157,8 @@ export class SurveyScene {
     const tileGeometry = roundedTile(0.93, 0.27, 0.055);
     const tileMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      metalness: 0.55,
-      roughness: 0.28,
+      metalness: 0.24,
+      roughness: 0.55,
     });
     this.tiles = new THREE.InstancedMesh(
       tileGeometry,
@@ -170,9 +171,9 @@ export class SurveyScene {
     this.tileBases = new THREE.InstancedMesh(
       baseGeometry,
       new THREE.MeshStandardMaterial({
-        color: "#111f2b",
-        metalness: 0.75,
-        roughness: 0.48,
+        color: "#352d27",
+        metalness: 0.65,
+        roughness: 0.6,
       }),
       this.count,
     );
@@ -183,7 +184,7 @@ export class SurveyScene {
       new THREE.PlaneGeometry(0.79, 0.79),
       new THREE.MeshBasicMaterial({
         map: sigilTexture,
-        color: "#8ac4c8",
+        color: "#684733",
         transparent: true,
         opacity: 0.6,
         depthWrite: false,
@@ -193,7 +194,7 @@ export class SurveyScene {
     this.board.add(this.slits);
     this.innerLights = new THREE.InstancedMesh(
       new THREE.RingGeometry(0.11, 0.135, 24),
-      new THREE.MeshBasicMaterial({ color: "#56858c", side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({ color: "#d8ba87", side: THREE.DoubleSide }),
       this.count,
     );
     this.board.add(this.innerLights);
@@ -220,6 +221,7 @@ export class SurveyScene {
           transparent: true,
           depthWrite: false,
           alphaTest: 0.1,
+          toneMapped: false,
         }),
         this.count,
       );
@@ -385,33 +387,6 @@ export class SurveyScene {
     const underside = new THREE.DirectionalLight("#537a8d", 1.6);
     underside.position.set(4, -3, 8);
     this.scene.add(underside);
-  }
-
-  setupEnvironment() {
-    const positions = [];
-    const random = seededRandom(71);
-    for (let i = 0; i < 280; i++)
-      positions.push(
-        (random() - 0.5) * 140,
-        (random() - 0.5) * 100,
-        (random() - 0.5) * 130,
-      );
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(positions, 3),
-    );
-    this.stars = new THREE.Points(
-      geometry,
-      new THREE.PointsMaterial({
-        color: "#a7bbc7",
-        size: 0.055,
-        transparent: true,
-        opacity: 0.48,
-        sizeAttenuation: true,
-      }),
-    );
-    this.scene.add(this.stars);
   }
 
   createFoundation() {
@@ -651,10 +626,11 @@ export class SurveyScene {
   createCursor() {
     this.cursor = new THREE.Group();
     const material = new THREE.MeshBasicMaterial({
-      color: "#d6f3e9",
+      color: "#ffe0a5",
       transparent: true,
       opacity: 0.92,
     });
+    this.cursorMaterial = material;
     for (const x of [-1, 1]) {
       for (const z of [-1, 1]) {
         const a = new THREE.Mesh(
@@ -710,14 +686,18 @@ export class SurveyScene {
         1,
       );
       const color =
-        cell.wrongFlag || cell.exploded
+        cell.wrongFlag || cell.exploded || (cell.revealed && cell.mine)
           ? PALETTE.danger
-          : isSelected
-            ? PALETTE.hover
+          : cell.revealed
+            ? isSelected
+              ? PALETTE.openHover
+              : PALETTE.open
             : cell.flagged
-              ? PALETTE.flagged
-              : cell.revealed
-                ? PALETTE.open
+              ? isSelected
+                ? PALETTE.flaggedHover
+                : PALETTE.flagged
+              : isSelected
+                ? PALETTE.hover
                 : PALETTE.closed;
       this.tiles.setColorAt(cell.id, color);
       this.dummy.position.set(p.x, level + 0.029, p.z);
@@ -854,6 +834,7 @@ export class SurveyScene {
     if (id >= 0) {
       const p = this.position(id);
       this.cursor.position.set(p.x, 0.42, p.z);
+      this.cursorMaterial.color.set("#ffe0a5");
     }
   }
 
@@ -984,11 +965,17 @@ export class SurveyScene {
   animate(time) {
     this.frame = null;
     if (this.disposed || document.hidden) return;
-    const elapsed = Math.max(0, (time - this.lastTime) / 1000);
+    const elapsed =
+      this.lastTime > 0 ? Math.max(0, (time - this.lastTime) / 1000) : 0;
     const delta = Math.min(elapsed, 0.1);
     this.lastTime = time;
     this.controls.update();
-    this.cosmos.update(time / 1000, this.reducedMotion.matches);
+    this.cosmos.update(
+      time / 1000,
+      this.reducedMotion.matches,
+      this.camera,
+      elapsed,
+    );
     this.effects.update(elapsed, time / 1000);
     const wasCelebrating = this.fireworks.active;
     this.fireworks.update(elapsed);
@@ -1091,22 +1078,10 @@ function makeDigitTexture(value) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 128;
   const ctx = canvas.getContext("2d");
-  const colors = [
-    "#b8f0ef",
-    "#a9d4c0",
-    "#efc390",
-    "#b6b8e6",
-    "#eea2a0",
-    "#96ccd7",
-    "#e0d6bf",
-    "#f3ede4",
-  ];
-  ctx.font = "600 96px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.font = "700 96px ui-monospace, SFMono-Regular, Menlo, monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.shadowColor = "rgba(10, 24, 35, 0.9)";
-  ctx.shadowBlur = 7;
-  ctx.fillStyle = colors[value - 1];
+  ctx.fillStyle = "#fff4db";
   ctx.fillText(String(value), 64, 69);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -1130,7 +1105,7 @@ function makeSigilTexture() {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 128;
   const ctx = canvas.getContext("2d");
-  ctx.strokeStyle = "#b3eff3";
+  ctx.strokeStyle = "#d9c9aa";
   ctx.lineWidth = 1.3;
   for (const [x, y, signX, signY] of [
     [12, 12, 1, 1],
@@ -1144,7 +1119,7 @@ function makeSigilTexture() {
     ctx.lineTo(x + signX * 13, y);
     ctx.stroke();
   }
-  ctx.strokeStyle = "rgba(179,239,243,0.7)";
+  ctx.strokeStyle = "rgba(217,201,170,0.7)";
   ctx.beginPath();
   ctx.moveTo(64, 57);
   ctx.lineTo(71, 64);

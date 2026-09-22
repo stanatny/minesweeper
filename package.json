@@ -6,13 +6,15 @@
   "scripts": {
     "build": "node scripts/build.js",
     "dev": "npm run build && python3 -m http.server 8765 --bind 0.0.0.0",
-    "test": "node --test tests/game_engine.test.js tests/detonation_sequence.test.js tests/surface_topology.test.js tests/victory_fireworks.test.js",
+    "test": "node --test tests/game_engine.test.js tests/detonation_sequence.test.js tests/surface_topology.test.js tests/victory_fireworks.test.js tests/meteor_shower.test.js",
     "test:browser": "node tests/browser_test.js",
     "test:polish": "node tests/polish_regression_test.js",
     "test:timing": "node tests/detonation_timing_browser_test.js",
     "test:flames": "node tests/flame_effects_browser_test.js",
     "test:fireworks": "node tests/victory_fireworks_browser_test.js",
-    "test:surface": "node tests/surface_browser_test.js"
+    "test:surface": "node tests/surface_browser_test.js",
+    "test:cosmos": "node tests/cosmic_background_browser_test.js",
+    "test:celestial": "node tests/celestial_bodies_browser_test.js"
   },
   "dependencies": {
     "three": "0.186.0"

@@ -22,6 +22,18 @@ const cross = (a, b) => [
 const pointKey = (point) => point.join(",");
 const edgeKey = (a, b) => [pointKey(a), pointKey(b)].sort().join("|");
 
+function verticalColumns(topology) {
+  const n = topology.resolution;
+  return Array.from({ length: n * n }, (_, id) => {
+    const x = id % n;
+    const z = Math.floor(id / n);
+    const floor = topology.cells[3 * n * n + z * n + x].center[1] + n / 2;
+    const ceiling =
+      topology.cells[2 * n * n + (n - 1 - z) * n + x].center[1] + n / 2;
+    return { x, z, floor, ceiling };
+  });
+}
+
 function triangles(cell) {
   const result = [];
   for (let row = 0; row < cell.patchSize - 1; row += 1) {
@@ -78,7 +90,10 @@ test("surface configuration validates shape, integer resolution, safe seed, and 
 test("every resolution and shape preserves six complete direction atlases and exact surface area", () => {
   for (let resolution = 4; resolution <= 12; resolution += 1) {
     for (const shape of ["cube", "stepped", "terrace"]) {
-      for (const irregularity of [0, 0.05, 0.45, 1]) {
+      for (const irregularity of Array.from(
+        { length: 21 },
+        (_, index) => index / 20,
+      )) {
         for (const seed of [1, 42, 14864]) {
           const topology = createSurface({
             resolution,
@@ -215,11 +230,18 @@ test("all tiles are coplanar unit squares with outward axis-aligned normals and 
 test("integer corner adjacency matches real contact and the closed mesh has one manifold link at every vertex", () => {
   for (const resolution of [4, 6, 12]) {
     for (const shape of ["cube", "stepped", "terrace"]) {
-      for (const seed of [1, 42, 912]) {
+      for (const [seed, irregularity] of [
+        [1, 0.05],
+        [42, 0.45],
+        [912, 0.75],
+        [1, 1],
+        [42, 1],
+        [912, 1],
+      ]) {
         const topology = createSurface({
           resolution,
           shape,
-          irregularity: 1,
+          irregularity,
           seed,
         });
         const owners = new Map();
@@ -318,6 +340,136 @@ test("regular cubes have the usual corner graph and zero irregularity removes ev
   }
 });
 
+test("opposite corner cuts remain separate, retain solid center walls, and leave every axis ray connected", () => {
+  for (let resolution = 4; resolution <= 12; resolution += 1) {
+    for (const shape of ["stepped", "terrace"]) {
+      for (const irregularity of [0.001, 0.05, 0.45, 1]) {
+        for (const seed of [1, 42, 14864]) {
+          const topology = createSurface({
+            resolution,
+            shape,
+            irregularity,
+            seed,
+          });
+          const columns = verticalColumns(topology);
+          const upper = columns.filter((column) => column.ceiling < resolution);
+          const lower = columns.filter((column) => column.floor > 0);
+          assert(upper.length > 0 && lower.length > 0);
+          assert(
+            columns.every(
+              (column) =>
+                Number.isInteger(column.floor) &&
+                Number.isInteger(column.ceiling) &&
+                column.floor >= 0 &&
+                column.floor < column.ceiling &&
+                column.ceiling <= resolution,
+            ),
+          );
+          for (const axis of ["x", "z"]) {
+            const upperMin = Math.min(...upper.map((column) => column[axis]));
+            const upperMax = Math.max(...upper.map((column) => column[axis]));
+            const lowerMin = Math.min(...lower.map((column) => column[axis]));
+            const lowerMax = Math.max(...lower.map((column) => column[axis]));
+            assert(
+              upperMin - lowerMax >= 2 || lowerMin - upperMax >= 2,
+              "At least one full voxel wall must separate opposite cuts",
+            );
+            assert(
+              Array.from({ length: resolution }, (_, index) =>
+                columns.filter((column) => column[axis] === index),
+              ).some((wall) =>
+                wall.every(
+                  (column) =>
+                    column.floor === 0 && column.ceiling === resolution,
+                ),
+              ),
+            );
+          }
+          const occupied = (x, y, z) => {
+            const column = columns[x + z * resolution];
+            return y >= column.floor && y < column.ceiling;
+          };
+          for (let axis = 0; axis < 3; axis += 1) {
+            for (let a = 0; a < resolution; a += 1) {
+              for (let b = 0; b < resolution; b += 1) {
+                const line = Array.from({ length: resolution }, (_, index) => {
+                  const point = [a, b];
+                  point.splice(axis, 0, index);
+                  return occupied(...point);
+                });
+                const first = line.indexOf(true);
+                const last = line.lastIndexOf(true);
+                assert(first >= 0);
+                assert(
+                  line.slice(first, last + 1).every(Boolean),
+                  "An axis ray must not cross disconnected solid intervals",
+                );
+              }
+            }
+          }
+          const primaryX = topology.viewDirection[0] > 0 ? resolution - 1 : 0;
+          const primaryZ = topology.viewDirection[2] > 0 ? resolution - 1 : 0;
+          assert.equal(occupied(primaryX, resolution - 1, primaryZ), false);
+          assert.equal(
+            occupied(resolution - 1 - primaryX, 0, resolution - 1 - primaryZ),
+            false,
+          );
+        }
+      }
+    }
+  }
+});
+
+test("default-sized corner cuts are both visible in geometry and vary independently across seeds", () => {
+  for (const shape of ["stepped", "terrace"]) {
+    let asymmetric = 0;
+    const layouts = new Set();
+    for (let seed = 14864; seed < 14884; seed += 1) {
+      const topology = createSurface({
+        resolution: 6,
+        irregularity: 0.45,
+        shape,
+        seed,
+      });
+      assert.equal(topology.cellCount, 216);
+      assert.equal(topology.surfaceArea, 216);
+      const upper = [],
+        lower = [];
+      for (const column of verticalColumns(topology)) {
+        for (let y = column.ceiling; y < 6; y += 1)
+          upper.push([column.x, y, column.z].join(","));
+        for (let y = 0; y < column.floor; y += 1)
+          lower.push([5 - column.x, 5 - y, 5 - column.z].join(","));
+      }
+      upper.sort();
+      lower.sort();
+      if (JSON.stringify(upper) !== JSON.stringify(lower)) asymmetric += 1;
+      layouts.add(JSON.stringify([upper, lower]));
+      const recessed = topology.cells.filter(
+        (cell) =>
+          Math.abs(cell.center[cell.normal.findIndex((value) => value !== 0)]) <
+          3,
+      );
+      assert(
+        recessed.filter((cell) => dot(cell.normal, topology.viewDirection) > 0)
+          .length >= 8,
+      );
+      assert(
+        recessed.filter((cell) => dot(cell.normal, topology.viewDirection) < 0)
+          .length >= 8,
+      );
+    }
+    assert(
+      asymmetric > 0,
+      "The opposite corner must not always be a mirrored copy",
+    );
+    assert(
+      layouts.size > 4,
+      "Different seeds must produce more than camera rotations alone",
+    );
+  }
+});
+
 test("seed and relief change the block layout deterministically while keeping exact tile sizes and area", () => {
   const options = {
     resolution: 8,
@@ -347,7 +499,8 @@ test("seed and relief change the block layout deterministically while keeping ex
     return Math.abs(cell.center[axis]) < options.resolution / 2;
   });
   assert(cut.length > 0);
-  assert(cut.every((cell) => dot(cell.normal, baseline.viewDirection) > 0));
+  assert(cut.some((cell) => dot(cell.normal, baseline.viewDirection) > 0));
+  assert(cut.some((cell) => dot(cell.normal, baseline.viewDirection) < 0));
   assert(baseline.cells.some((cell) => cell.neighbors.length > 8));
   const smaller = createSurface({ resolution: 4, shape: "cube" });
   const larger = createSurface({ resolution: 12, shape: "cube" });
@@ -544,6 +697,7 @@ test("an incorrect cross-face chord loses, identifies the hit, and exposes wrong
 
 test("surface snapshots mask answers and isolate state from input geometry and adjacency mutations", () => {
   const original = structuredClone(createSurface({ resolution: 4 }));
+  const expectedNeighbors = [...original.cells[0].neighbors];
   original.mine = "answer";
   original.cells[0].mine = true;
   original.cells[0].adjacent = 8;
@@ -555,11 +709,11 @@ test("surface snapshots mask answers and isolate state from input geometry and a
   assert.equal(field.toggleFlag(0).action, "noop");
   original.cells[0].neighbors.length = 0;
   original.cells[0].center[0] = 999;
-  assert.equal(field.neighbors(0).length, 7);
+  assert.deepEqual(field.neighbors(0), expectedNeighbors);
   assert.notEqual(field.topology.cells[0].center[0], 999);
   const neighbors = field.neighbors(0);
   neighbors.length = 0;
-  assert.equal(field.neighbors(0).length, 7);
+  assert.deepEqual(field.neighbors(0), expectedNeighbors);
   field.reveal(0);
   const snapshot = field.snapshot();
   assert.equal(snapshot.topology, field.topology);

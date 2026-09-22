@@ -281,6 +281,127 @@ function isConcave(game, id) {
   });
 }
 
+async function verifyOppositeCutCorners(page) {
+  await page.locator("#reset-camera").click();
+  await frames(page, 8);
+  let game = await state(page);
+  const { cells, resolution, viewDirection } = game.topology;
+  const recessed = cells.filter((cell) => {
+    const axis = cell.normal.findIndex((value) => value !== 0);
+    return Math.abs(cell.center[axis]) < resolution / 2 - 1e-8;
+  });
+  const evidence = [];
+  for (const sign of [1, -1]) {
+    const corner = recessed.filter(
+      (cell) => sign * dot(cell.normal, viewDirection) > 0,
+    );
+    assert.equal(
+      new Set(corner.map((cell) => cell.normal.join(","))).size,
+      3,
+      "Each opposite cut must expose three perpendicular recessed face directions",
+    );
+    const target = viewDirection.map((value) => value * sign);
+    const beforeOrbit = await state(page);
+    const gesture = await page.evaluate((target) => {
+      const scene = window.__surveyTest.getScene();
+      const rect = scene.renderer.domElement.getBoundingClientRect();
+      const theta = Math.atan2(target[0], target[2]);
+      const phi = Math.acos(target[1] / Math.hypot(...target));
+      const difference = theta - scene.controls.getAzimuthalAngle();
+      const pixels = rect.height / (2 * Math.PI * scene.controls.rotateSpeed);
+      const dx =
+        -Math.atan2(Math.sin(difference), Math.cos(difference)) * pixels;
+      const dy = -(phi - scene.controls.getPolarAngle()) * pixels;
+      return {
+        x: rect.x + rect.width / 2 - dx / 2,
+        y: rect.y + rect.height / 2 - dy / 2,
+        dx,
+        dy,
+        width: rect.width,
+        height: rect.height,
+      };
+    }, target);
+    assert.ok(
+      Math.abs(gesture.dx) < gesture.width - 20 &&
+        Math.abs(gesture.dy) < gesture.height - 20,
+    );
+    if (Math.hypot(gesture.dx, gesture.dy) > 6) {
+      await page.mouse.move(gesture.x, gesture.y);
+      await page.mouse.down();
+      await page.mouse.move(gesture.x + gesture.dx, gesture.y + gesture.dy, {
+        steps: 18,
+      });
+      await page.mouse.up();
+    }
+    await page.waitForFunction((target) => {
+      const scene = window.__surveyTest.getScene();
+      const direction = scene.camera.position
+        .clone()
+        .sub(scene.controls.target)
+        .normalize();
+      const length = Math.hypot(...target);
+      return (
+        (direction.x * target[0]) / length +
+          (direction.y * target[1]) / length +
+          (direction.z * target[2]) / length >
+        0.9999995
+      );
+    }, target);
+    await frames(page);
+    assert.deepEqual(
+      await state(page),
+      beforeOrbit,
+      "Dragging between opposite cut corners must not change the round",
+    );
+    const candidates = corner.filter(
+      (cell) => !game.cells[cell.id].mine && isConcave(game, cell.id),
+    );
+    const visible = await page.evaluate(
+      (ids) =>
+        ids
+          .map((id) => ({
+            id,
+            ...window.__surveyTest.getScene().projectCell(id),
+          }))
+          .filter((point) => point.visible),
+      candidates.map((cell) => cell.id),
+    );
+    assert.ok(
+      visible.length > 0,
+      "A real orbit must expose clickable concave tiles at both opposite corners",
+    );
+    const selected =
+      visible.find((point) => !game.cells[point.id].revealed) || visible[0];
+    const previouslyRevealed = game.cells[selected.id].revealed;
+    // Click directly in the dragged view: focus() must not silently turn this corner into view.
+    await page.mouse.move(selected.x, selected.y);
+    await frames(page);
+    assert.equal(
+      await page.evaluate(() => window.__surveyTest.getScene().activeCellId),
+      selected.id,
+    );
+    await page.mouse.click(selected.x, selected.y);
+    await frames(page);
+    game = await state(page);
+    assert.equal(game.cells[selected.id].revealed, true);
+    const screenshot =
+      sign === 1
+        ? "surface_first_cut_corner.png"
+        : "surface_opposite_cut_corner.png";
+    await capture(page, screenshot);
+    evidence.push({
+      corner: sign === 1 ? "initial" : "opposite",
+      recessedTiles: corner.length,
+      visibleConcaveTiles: visible.length,
+      clickedId: selected.id,
+      newlyRevealed: !previouslyRevealed,
+      dragPixels: [gesture.dx, gesture.dy],
+      screenshot,
+    });
+  }
+  return evidence;
+}
+
 async function labelMatrix(page, id) {
   return page.evaluate((cellId) => {
     const scene = window.__surveyTest.getScene();
@@ -348,7 +469,10 @@ function isSeam(game, id) {
 }
 
 async function capture(page, name) {
-  await page.screenshot({ path: resolve(ARTIFACT_DIR, name), fullPage: true });
+  await page.screenshot({
+    path: resolve(ARTIFACT_DIR, name),
+    fullPage: true,
+  });
 }
 
 async function revealFirst(page, touch = false) {
@@ -414,7 +538,10 @@ async function retainRenderer(page) {
 }
 
 await mkdir(ARTIFACT_DIR, { recursive: true });
-const browser = await chromium.launch({ channel: "chrome", headless: true });
+const browser = await chromium.launch({
+  channel: "chrome",
+  headless: true,
+});
 try {
   const desktopContext = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
@@ -506,7 +633,9 @@ try {
   );
   await page.mouse.move(dragPoint.x, dragPoint.y);
   await page.mouse.down();
-  await page.mouse.move(dragPoint.x + 110, dragPoint.y + 35, { steps: 12 });
+  await page.mouse.move(dragPoint.x + 110, dragPoint.y + 35, {
+    steps: 12,
+  });
   await page.mouse.up();
   await frames(page, 6);
   assert.deepEqual(
@@ -570,9 +699,11 @@ try {
     );
   }
   await verifyFixedNumber(page, game, seamId);
+  const oppositeCorners = await verifyOppositeCutCorners(page);
   await capture(page, "surface_desktop.png");
   passed(
-    "concave and back-face input, fixed face numbers, orbiting, and cross-seam highlights work",
+    "both opposite cut corners, back-face input, fixed face numbers, and cross-seam highlights work",
+    { oppositeCorners },
   );
 
   const beforeDraft = await state(page);

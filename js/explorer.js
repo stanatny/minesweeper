@@ -147,7 +147,7 @@ function updateSurfaceDraft() {
   $("surface-relief-hint").textContent =
     draft.shape === "cube"
       ? "A regular cube has no corner cuts."
-      : "Deeper steps. Equal square tiles.";
+      : "Opposite corners. Equal square tiles.";
   $("surface-density-value").textContent =
     `${draft.density}% · ${Math.floor((count * draft.density) / 100)} cores`;
   $("surface-draft-note").textContent =

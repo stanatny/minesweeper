@@ -4,20 +4,25 @@
 
 ### Added
 
-- Optional faceted-solid minefields with Corner cut, Terraces, and Cube generators, 96–864 equal square tiles, independently adjustable area and corner cuts, and configurable core density.
+- The Sun, all eight planets, and Pluto distributed around the surrounding sky, with distinct procedural surfaces, Saturn rings, and a soft solar corona.
+- Copper minefield covers with deep smoked-umber revealed faces, pale cream-gold numbers, and coordinated hover, focus, and marking colors across planar, faceted, and compatibility views.
+- A Milky Way dust band and occasional meteor trails; the surrounding sky follows camera rotation behind both field types, maintains its angular scale during board zoom, and respects reduced motion.
+- Optional faceted-solid minefields with Opposite cuts, Terraces, and Cube generators, 96–864 equal square tiles, independently adjustable area and corner cuts, and configurable core density.
+- Independent stepped recesses at opposite top and bottom corners, preserving equal tile sizes, exact surface area, a connected solid, and the six-direction atlas.
 - Actual edge-and-corner adjacency across a closed stepped body, with first-move protection, flood reveal, chording, neighbor highlighting, back-face exploration, and a six-direction compatibility atlas.
 - Surface-oriented mine models and flame jets, detonation ordering by distance along neighboring tiles, and the existing victory celebration on 3D objects.
 - A victory fireworks sequence with rising golden trails, colorful aerial bursts, and synchronized sound effects. Celebration effects respect reduced motion and stop immediately when a new survey begins.
 
 ### Changed
 
+- Enlarged apparent celestial diameters by 40%, scaling Saturn rings and the solar corona with their bodies and leaving more space around Jupiter in the initial mobile view.
 - Faceted solids use uniform square metal plates and numbers fixed to their face orientation, including inside corners.
-
 - Balanced the reactor lighting with a soft cyan glow and visible crystal facets, reducing glare while keeping the scene luminous.
-- Switched repository documentation, interface copy, and source comments to English, and standardized native build names as `Minesweeper.app` and `Minesweeper`.
+- Switched repository documentation and interface copy to English, and standardized native build names as `Minesweeper.app` and `Minesweeper`.
 
 ### Fixed
 
+- Circular celestial silhouettes at every viewing angle and viewport size, correcting Jupiter's previous off-axis perspective stretching while preserving fixed world bearings.
 - Keep the first rows of tall compatibility atlases reachable when the board overflows its viewport.
 - Release post-processing resources before disposing the renderer when switching field types.
 - Keep the Top view button synchronized after regeneration and focus the visible field selector when opening settings.

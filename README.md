@@ -36,7 +36,7 @@ Use **Field type → Faceted solid** to play across an entire closed 3D object. 
 
 Open **Shape generator** to prepare a new field:
 
-- **Corner cut** creates a block with a stepped recess. **Terraces** creates successive setbacks. **Cube** keeps a regular cubic silhouette.
+- **Opposite cuts** creates independent stepped recesses at two opposite corners, including the underside. **Terraces** adds successive setbacks at both corners. **Cube** keeps a regular cubic silhouette.
 - **Surface area** selects 96–864 playable tiles. Each tile has an area of one square unit, so this changes the actual area without stretching individual squares.
 - **Corner cuts** changes the depth and arrangement of integer-sized steps while preserving the total area and tile count. This control is disabled for the regular Cube. Increasing cuts changes the shape in discrete steps.
 - **Core density** sets the proportion of mines from 8% to 25%.
@@ -46,11 +46,17 @@ Tiles sharing an edge or corner are neighbors, including across convex ridges an
 
 Arrow keys follow adjacent tiles in the current viewing direction, and keyboard focus turns a hidden face into view. Top view is a camera preset; rotation remains available. Mines, beacons, and flame jets follow their supporting face.
 
-The generator cuts whole blocks from a cubic volume to create one closed orthogonal body. The cuts preserve surface area, and all exposed faces are tiled with equal squares. Shape seeds are displayed beneath the generator. If WebGL becomes unavailable, the same game continues in a six-direction atlas with the original cross-face adjacency and accessible neighbor labels. The atlas groups tiles by the direction they face, including separate terraces at different depths.
+The generator cuts whole blocks from opposite corners of a cubic volume to create one closed orthogonal body. A solid center keeps the body connected without tunnels or touching cutouts. The cuts preserve surface area, and all exposed faces are tiled with equal squares. Shape seeds are displayed beneath the generator. If WebGL becomes unavailable, the same game continues in a six-direction atlas with the original cross-face adjacency and accessible neighbor labels. The atlas groups tiles by the direction they face, including separate terraces at different depths.
 
 The generator collapses after the first reveal to make room for the survey status; reopen it to prepare another shape.
 
 ### Effects and audio
+
+Minefields use copper covers and deep smoked-umber revealed faces, with pale cream-gold printed numbers and warm beveled edges. Marked cells use a deep teal base and a gold beacon; hover and keyboard focus remain visible on both copper and brown surfaces. The same state colors are used by the compatibility grid.
+
+Both browser field types share a procedural deep-space backdrop with the Sun, Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, and Pluto distributed around the entire sky. Rotate horizontally and vertically to discover their different directions: Jupiter has cloud bands and a red storm, Saturn has layered rings, Earth has oceans, continents, and clouds, and the Sun has a soft corona. Sizes, positions, and illumination are composed for gameplay.
+
+The starfield, Milky Way, and celestial bodies have fixed world bearings. They move out of view while orbiting and return when you turn back. Each body uses a shaded spherical surface with a circular screen silhouette, preventing the edge-of-screen stretching of a wide-angle perspective view. Saturn's tilted rings pass in front of and behind its globe. Zoom changes the minefield scale while the distant sky keeps its angular size. Background objects stay behind playable tiles and never intercept input. Meteor activity and decorative surface motion pause with the page and stop when reduced motion is enabled.
 
 Background music and sound effects are enabled by default and start after the first click or key press. The music-note and speaker buttons in the upper-right corner control them independently. Audio pauses while the page is hidden.
 
@@ -73,6 +79,8 @@ npm run test:timing
 npm run test:flames
 npm run test:fireworks
 npm run test:surface
+npm run test:cosmos
+npm run test:celestial
 ```
 
 After editing `js/`, run `npm run build` and refresh the page. The browser loads `dist/explorer.js`, rather than the source modules. Build artifacts are checked in to support direct opening and static hosting.
@@ -82,10 +90,13 @@ After editing `js/`, run `npm run build` and refresh the page. The browser loads
 - `index.html`, `css/style.css`: Responsive mission interface and accessible controls.
 - `js/explorer.js`: Input, timing, difficulty, game status, and compatibility mode.
 - `js/game_engine.js`: Independent Minesweeper state engine.
-- `js/surface_topology.js`: Deterministic stepped solids, unit-square tiles, shared-corner adjacency, and independently controlled area and corner cuts.
+- `js/surface_topology.js`: Deterministic solids with opposite-corner recesses, unit-square tiles, shared-corner adjacency, and independently controlled area and corner cuts.
 - `js/surface_scene.js`: Equal square plates, face-aligned numbers, full-object orbiting, occlusion-aware picking, neighbor highlighting, and face-oriented mines and flame jets.
 - `js/survey_scene.js`: Editable, procedural 3D models for hatches, fractured rock columns, the floating reactor, orbital rings, beacons, and the camera.
-- `js/cosmic_environment.js`: Procedural planet, atmosphere, stars, and dust.
+- `js/cosmic_environment.js`: Milky Way, stars, and shared celestial-camera integration.
+- `js/celestial_bodies.js`: Ten fixed celestial bearings, circular apparent silhouettes, Saturn rings, and the solar corona.
+- `js/celestial_materials.js`: Procedural spherical surfaces, cloud bands, terrain, craters, storms, and soft lighting, without external texture downloads.
+- `js/meteor_shower.js`: Pooled, intermittent meteor trails with visible-time scheduling and reduced-motion cleanup.
 - `js/survey_effects.js`: Shared particle pools, scan waves, beacon columns, shockwaves, and ember trails.
 - `js/flame_jets.js`: Instanced flame jets, branching tongues, and short smoke tails, with a fixed pool for dense explosions.
 - `js/victory_fireworks.js`: Pooled victory rockets, aerial bursts, and falling spark trails.

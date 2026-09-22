@@ -846,30 +846,48 @@ kbd {
   width: max-content;
 }
 .fallback-board [role="gridcell"] {
+  --tile-hover: #28434a;
+  --tile-neighbor: #536772;
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid #344b58;
+  border: 1px solid #895b3f;
   border-radius: 3px;
-  background: #1c3443;
-  color: #c4ebed;
+  background: #b87b51;
+  color: #27343e;
   font-family: var(--font-data);
   font-weight: 600;
 }
 .fallback-board [role="gridcell"]:hover {
-  background: #355766;
+  border-color: var(--tile-hover);
+  box-shadow: inset 0 0 0 1px var(--tile-hover);
+}
+.fallback-board [role="gridcell"]:focus-visible {
+  outline: 2px solid #fff3d7;
+  outline-offset: 1px;
+  box-shadow: inset 0 0 0 1px var(--tile-hover);
 }
 .fallback-board [data-state="revealed"] {
-  background: #101f28;
-  border-color: #1a3543;
+  --tile-hover: #edd7b6;
+  --tile-neighbor: #b4c6c3;
+  background: #6b4734;
+  border-color: #987050;
+  color: #fff4db;
 }
 .fallback-board [data-state="flagged"] {
-  color: var(--amber);
+  background: #28434a;
+  border-color: #93654d;
+  color: #efbc70;
 }
-.fallback-board [data-state="mine"],
-.fallback-board [data-state="wrong"] {
-  background: #65372c;
+.fallback-board [data-state="mine"] {
+  background: #8e3d32;
+  border-color: #d17a61;
   color: #fff0e8;
+}
+.fallback-board [data-state="wrong"] {
+  background: #f0cab7;
+  border-color: #aa5546;
+  color: #742f2b;
 }
 #scene-stage.fallback-active {
   pointer-events: none;
@@ -1596,7 +1614,7 @@ body[data-board-mode="surface"] .region-settings {
   letter-spacing: 1px;
 }
 .fallback-board [data-neighbor="true"] {
-  box-shadow: inset 0 0 0 1px var(--ice);
+  box-shadow: inset 0 0 0 2px var(--tile-neighbor);
 }
 @media (max-width: 760px) {
   .region-settings {

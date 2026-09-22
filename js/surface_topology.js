@@ -27,7 +27,12 @@ export function createSurface({
   }
   const n = resolution;
   const random = seededRandom(seed);
-  const heights = createHeights(n, irregularity, shape, random);
+  const { floors, ceilings } = createVerticalBounds(
+    n,
+    irregularity,
+    shape,
+    random,
+  );
   const rotation = ROTATIONS[Math.floor(random() * ROTATIONS.length)];
   const view = [1.25, 0.9, 1.5];
   const viewLength = Math.hypot(...view);
@@ -38,7 +43,7 @@ export function createSurface({
   const voxelId = (x, y, z) => x + n * (y + n * z);
   for (let z = 0; z < n; z += 1) {
     for (let x = 0; x < n; x += 1) {
-      for (let y = 0; y < heights[x + n * z]; y += 1) {
+      for (let y = floors[x + n * z]; y < ceilings[x + n * z]; y += 1) {
         const original = [x, y, z];
         const transformed = rotation.axes.map((axis, index) =>
           rotation.signs[index] > 0 ? original[axis] : n - 1 - original[axis],
@@ -147,35 +152,76 @@ export function createSurface({
   });
 }
 
-// Nested corner cuts preserve all six projected n×n areas, replacing removed squares one for one.
-function createHeights(n, irregularity, shape, random) {
-  const heights = new Uint8Array(n * n).fill(n);
-  if (shape === "cube" || irregularity === 0) return heights;
-  const depth = Math.max(1, Math.round(irregularity * (n - 1)));
-  const levels =
-    shape === "stepped"
-      ? Math.min(depth, random() < 0.6 ? 1 : 2)
-      : Math.min(depth, Math.max(2, Math.ceil(n / 2)));
-  const minimumStart = Math.max(1, Math.floor(n * (0.65 - irregularity * 0.4)));
-  const variation = Math.max(1, Math.floor(n * 0.25));
-  const startX = Math.min(
-    n - 1,
-    minimumStart + Math.floor(random() * variation),
+// Opposite corner cuts stay on separate sides of full-height central walls.
+// Both vertical bounds are monotone in x/z, so every axis ray intersects one nonempty solid interval.
+function createVerticalBounds(n, irregularity, shape, random) {
+  const floors = new Uint8Array(n * n);
+  const ceilings = new Uint8Array(n * n).fill(n);
+  if (shape === "cube" || irregularity === 0) return { floors, ceilings };
+  const middle = Math.floor((n - 1) / 2);
+  const upperCuts = createCornerCuts(
+    n,
+    irregularity,
+    shape,
+    random,
+    n - middle - 1,
   );
-  const startZ = Math.min(
-    n - 1,
-    minimumStart + Math.floor(random() * variation),
-  );
-  for (let level = 0; level < levels; level += 1) {
-    const cutX = startX + Math.floor((level * (n - startX)) / levels);
-    const cutZ = startZ + Math.floor((level * (n - startZ)) / levels);
-    const cutDepth =
-      Math.floor(depth / levels) + (level < depth % levels ? 1 : 0);
-    for (let z = cutZ; z < n; z += 1) {
-      for (let x = cutX; x < n; x += 1) heights[x + n * z] -= cutDepth;
+  const lowerCuts = createCornerCuts(n, irregularity, shape, random, middle);
+  // Use spare footprint space to distinguish an accidental match without thinning the central walls.
+  if (
+    upperCuts[0].width < n - middle - 1 &&
+    JSON.stringify(upperCuts) === JSON.stringify(lowerCuts)
+  )
+    upperCuts[0].width += 1;
+  for (const cut of upperCuts) {
+    for (let z = n - cut.length; z < n; z += 1) {
+      for (let x = n - cut.width; x < n; x += 1) {
+        ceilings[x + n * z] -= cut.depth;
+      }
     }
   }
-  return heights;
+  for (const cut of lowerCuts) {
+    for (let z = 0; z < cut.length; z += 1) {
+      for (let x = 0; x < cut.width; x += 1) {
+        floors[x + n * z] += cut.depth;
+      }
+    }
+  }
+  return { floors, ceilings };
+}
+
+// Sample each corner independently; shallow, small boards may naturally produce matching single steps.
+function createCornerCuts(n, irregularity, shape, random, capacity) {
+  const depth = Math.max(
+    1,
+    Math.round(irregularity * (n - 1) * (0.8 + random() * 0.2)),
+  );
+  const levels =
+    shape === "stepped"
+      ? Math.min(depth, capacity, random() < 0.6 ? 1 : 2)
+      : Math.min(depth, capacity, Math.max(2, Math.ceil(n / 2)));
+  const footprintSize = () =>
+    Math.min(
+      capacity,
+      Math.max(
+        capacity >= 2 && irregularity >= 0.25 ? 2 : 1,
+        Math.round(
+          capacity * (0.55 + irregularity * 0.4) +
+            (random() - 0.5) * Math.min(2, capacity * 0.4),
+        ),
+      ),
+    );
+  const width = footprintSize();
+  const length = footprintSize();
+  const cuts = [];
+  for (let level = 0; level < levels; level += 1) {
+    cuts.push({
+      width: width - Math.floor((level * width) / levels),
+      length: length - Math.floor((level * length) / levels),
+      depth: Math.floor(depth / levels) + (level < depth % levels ? 1 : 0),
+    });
+  }
+  return cuts;
 }
 
 // Each direction uses the previous cube atlas projection; increasing u×v points out of the solid.
