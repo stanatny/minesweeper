@@ -1,56 +1,13 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
+import { orbitToDirection } from "./orbit_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const errors = [];
 const results = [];
 await mkdir("artifacts", { recursive: true });
 const browser = await chromium.launch({ channel: "chrome", headless: true });
-
-async function orbitTo(page, direction) {
-  const gesture = await page.evaluate((target) => {
-    const scene = window.__surveyTest.getScene();
-    const rect = scene.renderer.domElement.getBoundingClientRect();
-    const theta = Math.atan2(target[0], target[2]);
-    const phi = Math.acos(target[1] / Math.hypot(...target));
-    const deltaTheta = Math.atan2(
-      Math.sin(theta - scene.controls.getAzimuthalAngle()),
-      Math.cos(theta - scene.controls.getAzimuthalAngle()),
-    );
-    const factor = rect.height / (2 * Math.PI * scene.controls.rotateSpeed);
-    const dx = -deltaTheta * factor;
-    const dy = -(phi - scene.controls.getPolarAngle()) * factor;
-    return {
-      x: rect.x + rect.width / 2 - dx / 2,
-      y: rect.y + rect.height / 2 - dy / 2,
-      dx,
-      dy,
-    };
-  }, direction);
-  if (Math.hypot(gesture.dx, gesture.dy) > 6) {
-    await page.mouse.move(gesture.x, gesture.y);
-    await page.mouse.down();
-    for (let step = 1; step <= 24; step++) {
-      await page.mouse.move(
-        gesture.x + (gesture.dx * step) / 24,
-        gesture.y + (gesture.dy * step) / 24,
-      );
-      await page.waitForTimeout(18);
-    }
-    await page.mouse.up();
-  }
-  await page.waitForFunction((target) => {
-    const scene = window.__surveyTest.getScene();
-    const current = scene.camera.position
-      .clone()
-      .sub(scene.controls.target)
-      .normalize();
-    return (
-      current.dot(current.clone().fromArray(target).normalize()) > 0.999999
-    );
-  }, direction);
-}
 
 async function snapshot(page) {
   return page.evaluate(() => {
@@ -209,42 +166,55 @@ try {
     "venus",
     "uranus",
   ]) {
+    const direction = await page.evaluate(
+      (bodyId) =>
+        window.__surveyTest
+          .getScene()
+          .cosmos.bodies.find((body) => body.id === bodyId)
+          .direction.toArray()
+          .map((value) => -value),
+      id,
+    );
+    await orbitToDirection(page, direction, {
+      minDot: 0.999999,
+      steps: 24,
+      stepDelay: 18,
+    });
     const target = await page.evaluate((bodyId) => {
-      const body = window.__surveyTest
-        .getScene()
-        .cosmos.bodies.find((item) => item.id === bodyId);
-      const [x, y, z] = body.direction.toArray();
-      const bearingYaw = Math.atan2(x, -z);
-      const elevation = Math.asin(y);
-      const aspect = window.__surveyTest.getScene().cosmos.skyCamera.aspect;
-      const tanHalfFov = Math.tan(Math.PI / 6);
-      const desiredY =
-        (elevation >= 0 ? 1 : -1) * (Math.abs(elevation) > 1.05 ? 0.82 : 0.57);
-      const ry = desiredY * tanHalfFov;
-      // 把目标放在侧上方，保持真实拖拽，同时让棋盘外的完整圆轮廓可见。
-      const maxRx = Math.sqrt(
-        (1 + ry * ry) * Math.max(0, 1 / (y * y || 1e-9) - 1),
-      );
-      const rx = Math.min(0.78 * aspect * tanHalfFov, maxRx * 0.9);
-      const normalization = Math.sqrt(1 + rx * rx + ry * ry);
-      const qx = rx / normalization,
-        qy = ry / normalization,
-        qf = 1 / normalization;
-      const aimElevation =
-        Math.asin(y / Math.hypot(qy, qf)) - Math.atan2(qy, qf);
-      const yaw =
-        bearingYaw -
-        Math.atan2(
-          qx,
-          qf * Math.cos(aimElevation) - qy * Math.sin(aimElevation),
-        );
-      return [
-        -Math.sin(yaw) * Math.cos(aimElevation),
-        -Math.sin(aimElevation),
-        Math.cos(yaw) * Math.cos(aimElevation),
-      ];
+      const scene = window.__surveyTest.getScene();
+      const body = scene.cosmos.bodies.find((item) => item.id === bodyId);
+      const extent =
+        bodyId === "saturn" ? 2.45 : bodyId === "sun" ? 1.75 : 1.18;
+      const desiredX = Math.min(0.72, 0.96 - body.radiusNdc[0] * extent);
+      const desiredY = Math.min(0.57, 0.96 - body.radiusNdc[1] * extent);
+      const tanHalfFov = Math.tan((scene.cosmos.skyCamera.fov * Math.PI) / 360);
+      const offset = scene.camera.position
+        .clone()
+        .sub(scene.controls.target)
+        .normalize();
+      const right = offset
+        .clone()
+        .set(1, 0, 0)
+        .applyQuaternion(scene.camera.quaternion);
+      const up = offset
+        .clone()
+        .set(0, 1, 0)
+        .applyQuaternion(scene.camera.quaternion);
+      // 使用当前屏幕坐标偏侧取景，保留自由旋转后的滚转，不重设世界 up。
+      return offset
+        .addScaledVector(
+          right,
+          desiredX * scene.cosmos.skyCamera.aspect * tanHalfFov,
+        )
+        .addScaledVector(up, desiredY * tanHalfFov)
+        .normalize()
+        .toArray();
     }, id);
-    await orbitTo(page, target);
+    await orbitToDirection(page, target, {
+      minDot: 0.999999,
+      steps: 24,
+      stepDelay: 18,
+    });
     await page.waitForTimeout(150);
     const current = await snapshot(page);
     const body = current.find((item) => item.id === id);

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import { orbitToDirection } from "./orbit_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const ARTIFACT_DIR = resolve("artifacts");
@@ -302,51 +303,7 @@ async function verifyOppositeCutCorners(page) {
     );
     const target = viewDirection.map((value) => value * sign);
     const beforeOrbit = await state(page);
-    const gesture = await page.evaluate((target) => {
-      const scene = window.__surveyTest.getScene();
-      const rect = scene.renderer.domElement.getBoundingClientRect();
-      const theta = Math.atan2(target[0], target[2]);
-      const phi = Math.acos(target[1] / Math.hypot(...target));
-      const difference = theta - scene.controls.getAzimuthalAngle();
-      const pixels = rect.height / (2 * Math.PI * scene.controls.rotateSpeed);
-      const dx =
-        -Math.atan2(Math.sin(difference), Math.cos(difference)) * pixels;
-      const dy = -(phi - scene.controls.getPolarAngle()) * pixels;
-      return {
-        x: rect.x + rect.width / 2 - dx / 2,
-        y: rect.y + rect.height / 2 - dy / 2,
-        dx,
-        dy,
-        width: rect.width,
-        height: rect.height,
-      };
-    }, target);
-    assert.ok(
-      Math.abs(gesture.dx) < gesture.width - 20 &&
-        Math.abs(gesture.dy) < gesture.height - 20,
-    );
-    if (Math.hypot(gesture.dx, gesture.dy) > 6) {
-      await page.mouse.move(gesture.x, gesture.y);
-      await page.mouse.down();
-      await page.mouse.move(gesture.x + gesture.dx, gesture.y + gesture.dy, {
-        steps: 18,
-      });
-      await page.mouse.up();
-    }
-    await page.waitForFunction((target) => {
-      const scene = window.__surveyTest.getScene();
-      const direction = scene.camera.position
-        .clone()
-        .sub(scene.controls.target)
-        .normalize();
-      const length = Math.hypot(...target);
-      return (
-        (direction.x * target[0]) / length +
-          (direction.y * target[1]) / length +
-          (direction.z * target[2]) / length >
-        0.9999995
-      );
-    }, target);
+    const gesture = await orbitToDirection(page, target);
     await frames(page);
     assert.deepEqual(
       await state(page),

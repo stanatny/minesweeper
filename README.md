@@ -18,21 +18,21 @@ The [GitHub Pages version](https://stanatny.github.io/minesweeper/) follows the 
 
 ### Controls
 
-| Action           | Input                                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Explore (reveal) | Left-click or tap a hatch. The first reveal and all its neighbors are safe.                                              |
-| Mark (flag)      | Right-click, select Mark mode in the bottom toolbar, or long-press on a touchscreen.                                     |
-| Chord            | Double-click a revealed number to open its remaining neighbors when the adjacent flag count matches.                     |
-| Orbit            | Drag the scene. Top-down view locks rotation on planar boards; faceted solids always allow orbiting.                     |
-| Zoom and pan     | Scroll or pinch to zoom. Middle-drag or drag with two fingers to pan on planar boards; two fingers orbit faceted solids. |
-| Keyboard         | Tab into the board, use the arrow keys to select a cell, press Enter or Space to reveal, and F to flag.                  |
-| View and restart | Press V for top-down view or R to restart. Restarting an active round requires confirmation.                             |
+| Action           | Input                                                                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Explore (reveal) | Left-click or tap a hatch. The first reveal and all its neighbors are safe.                                                 |
+| Mark (flag)      | Right-click, select Mark mode in the bottom toolbar, or long-press on a touchscreen.                                        |
+| Chord            | Double-click a revealed number to open its remaining neighbors when the adjacent flag count matches.                        |
+| Orbit            | Drag the scene. Top-down view locks rotation on planar boards; faceted solids allow continuous rotation through both poles. |
+| Zoom and pan     | Scroll or pinch to zoom. Middle-drag or drag with two fingers to pan on planar boards; two fingers orbit faceted solids.    |
+| Keyboard         | Tab into the board, use the arrow keys to select a cell, press Enter or Space to reveal, and F to flag.                     |
+| View and restart | Press V for top-down view or R to restart. Restarting an active round requires confirmation.                                |
 
 Choose Scout (beginner: 9 × 9, 10 mines), Deep (intermediate: 16 × 16, 40 mines), or Frontier (expert: 30 × 16, 99 mines). Custom boards support widths of 5–50, heights of 5–30, and 1 to width × height − 9 mines.
 
 ### Faceted solid mode
 
-Use **Field type → Faceted solid** to play across an entire closed 3D object. Drag to orbit freely and reach the back, top, underside, and recessed steps. Every tile is the same physical size: a unit square on a flat face. Numbers follow the orientation of their face instead of floating toward the camera.
+Use **Field type → Faceted solid** to play across an entire closed 3D object. Drag to rotate continuously in any direction, including complete vertical flips across both poles, and reach the back, top, underside, and recessed steps. Reset view restores the original upright orientation. Every tile is the same physical size: a unit square on a flat face. Numbers follow the orientation of their face instead of floating toward the camera.
 
 Open **Shape generator** to prepare a new field:
 
@@ -78,6 +78,7 @@ npm run test:polish
 npm run test:timing
 npm run test:flames
 npm run test:fireworks
+npm run test:orbit
 npm run test:surface
 npm run test:cosmos
 npm run test:celestial
@@ -92,6 +93,7 @@ After editing `js/`, run `npm run build` and refresh the page. The browser loads
 - `js/game_engine.js`: Independent Minesweeper state engine.
 - `js/surface_topology.js`: Deterministic solids with opposite-corner recesses, unit-square tiles, shared-corner adjacency, and independently controlled area and corner cuts.
 - `js/surface_scene.js`: Equal square plates, face-aligned numbers, full-object orbiting, occlusion-aware picking, neighbor highlighting, and face-oriented mines and flame jets.
+- `js/free_orbit_controls.js`: Continuous quaternion-based rotation for closed 3D fields, with mouse and touch input, pinch zoom, and gesture cancellation.
 - `js/survey_scene.js`: Editable, procedural 3D models for hatches, fractured rock columns, the floating reactor, orbital rings, beacons, and the camera.
 - `js/cosmic_environment.js`: Milky Way, stars, and shared celestial-camera integration.
 - `js/celestial_bodies.js`: Ten fixed celestial bearings, circular apparent silhouettes, Saturn rings, and the solar corona.

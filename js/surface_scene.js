@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { SurveyScene } from "./survey_scene.js";
 import { MineModels } from "./mine_model.js";
+import { FreeOrbitControls } from "./free_orbit_controls.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
 const COLORS = {
@@ -27,12 +28,6 @@ const COLORS = {
 export class SurfaceScene extends SurveyScene {
   constructor(container, callbacks) {
     super(container, callbacks);
-    this.controls.minPolarAngle = 0.001;
-    this.controls.maxPolarAngle = Math.PI - 0.001;
-    this.controls.enablePan = false;
-    this.controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
-    this.controls.maxZoom = 4;
-    this.controls.rotateSpeed = 0.7;
     this.surfaceView = true;
     this.highlightedIds = [];
     this.activeCellId = -1;
@@ -40,6 +35,11 @@ export class SurfaceScene extends SurveyScene {
     this.scene.add(new THREE.AmbientLight("#acc7d8", 0.85));
     this.bloom.strength = 0.3;
     this.bloom.threshold = 1.1;
+  }
+
+  // 闭合物体允许连续跨越两极；平面棋盘仍沿用原有俯仰范围。
+  createControls() {
+    return new FreeOrbitControls(this.camera, this.renderer.domElement);
   }
 
   rebuild(snapshot) {
@@ -678,18 +678,20 @@ export class SurfaceScene extends SurveyScene {
   }
 
   setCameraDirection(direction, target = new THREE.Vector3()) {
-    const damping = this.controls.enableDamping;
-    this.controls.enableDamping = false;
-    this.controls.update();
+    this.controls.stop();
     this.controls.target.copy(target);
     this.camera.position
       .copy(direction)
       .normalize()
       .multiplyScalar(Math.max(24, (this.radius || 4.3) * 4))
       .add(target);
+    // 预设和键盘寻格清除旧滚转，并在极点采用稳定的上方向。
+    const forward = this.camera.position.clone().sub(target).normalize();
+    this.camera.up
+      .copy(Math.abs(forward.y) > 0.98 ? new THREE.Vector3(0, 0, -1) : UP)
+      .addScaledVector(forward, -this.camera.up.dot(forward))
+      .normalize();
     this.camera.lookAt(target);
-    this.controls.update();
-    this.controls.enableDamping = damping;
     this.updateLabels();
   }
 

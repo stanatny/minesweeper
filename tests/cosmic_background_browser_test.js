@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import { orbitToDirection } from "./orbit_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const ARTIFACT_DIR = resolve("artifacts");
@@ -36,56 +37,6 @@ async function frames(page, count = 3) {
       }),
     count,
   );
-}
-
-async function orbitToDirection(page, direction) {
-  const gesture = await page.evaluate((target) => {
-    const scene = window.__surveyTest.getScene();
-    const rect = scene.renderer.domElement.getBoundingClientRect();
-    const length = Math.hypot(...target);
-    const theta = Math.atan2(target[0], target[2]);
-    const phi = Math.acos(target[1] / length);
-    const deltaTheta = Math.atan2(
-      Math.sin(theta - scene.controls.getAzimuthalAngle()),
-      Math.cos(theta - scene.controls.getAzimuthalAngle()),
-    );
-    const pixels = rect.height / (2 * Math.PI * scene.controls.rotateSpeed);
-    const dx = -deltaTheta * pixels;
-    const dy = -(phi - scene.controls.getPolarAngle()) * pixels;
-    return {
-      x: rect.x + rect.width / 2 - dx / 2,
-      y: rect.y + rect.height / 2 - dy / 2,
-      dx,
-      dy,
-      width: rect.width,
-      height: rect.height,
-    };
-  }, direction);
-  assert.ok(Math.abs(gesture.dx) < gesture.width - 20);
-  assert.ok(Math.abs(gesture.dy) < gesture.height - 20);
-  if (Math.hypot(gesture.dx, gesture.dy) > 6) {
-    await page.mouse.move(gesture.x, gesture.y);
-    await page.mouse.down();
-    await page.mouse.move(gesture.x + gesture.dx, gesture.y + gesture.dy, {
-      steps: 16,
-    });
-    await page.mouse.up();
-  }
-  await page.waitForFunction((target) => {
-    const scene = window.__surveyTest.getScene();
-    const direction = scene.camera.position
-      .clone()
-      .sub(scene.controls.target)
-      .normalize();
-    const length = Math.hypot(...target);
-    return (
-      (direction.x * target[0]) / length +
-        (direction.y * target[1]) / length +
-        (direction.z * target[2]) / length >
-      0.9999995
-    );
-  }, direction);
-  await frames(page);
 }
 
 function rotateAroundY([x, y, z], angle) {
@@ -661,7 +612,7 @@ try {
   const mobilePoint = await aimCell(mobile, 21);
   const mobileBefore = await backgroundState(mobile);
   const cdp = await mobileContext.newCDPSession(mobile);
-  // CDP sends real native touch events, including the two-finger pinch used by OrbitControls.
+  // CDP sends real native touch events, including the two-finger pinch used by the scene controls.
   const sendTouch = (type, points) =>
     cdp.send("Input.dispatchTouchEvent", {
       type,

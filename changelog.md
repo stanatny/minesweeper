@@ -22,6 +22,8 @@
 
 ### Fixed
 
+- Remove polar-angle stops from faceted-solid fields, allowing continuous free rotation and vertical flips with mouse or touch while preserving zoom, marking, and upright camera reset.
+- Cancel pending long-press input when a faceted-solid gesture loses pointer capture or window focus.
 - Circular celestial silhouettes at every viewing angle and viewport size, correcting Jupiter's previous off-axis perspective stretching while preserving fixed world bearings.
 - Keep the first rows of tall compatibility atlases reachable when the board overflows its viewport.
 - Release post-processing resources before disposing the renderer when switching field types.

@@ -76,25 +76,7 @@ export class SurveyScene {
     );
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.1;
-    this.controls.enablePan = true;
-    this.controls.minPolarAngle = 0.05;
-    this.controls.maxPolarAngle = Math.PI * 0.36;
-    this.controls.minZoom = 0.65;
-    this.controls.maxZoom = 5;
-    this.controls.mouseButtons = {
-      LEFT: THREE.MOUSE.ROTATE,
-      MIDDLE: THREE.MOUSE.PAN,
-      RIGHT: null,
-    };
-    this.controls.touches = {
-      ONE: THREE.TOUCH.ROTATE,
-      TWO: THREE.TOUCH.DOLLY_PAN,
-    };
-    this.controls.rotateSpeed = 0.55;
-    this.controls.zoomSpeed = 0.8;
+    this.controls = this.createControls();
     this.pointer = new THREE.Vector2();
     this.raycaster = new THREE.Raycaster();
     this.dummy = new THREE.Object3D();
@@ -127,6 +109,10 @@ export class SurveyScene {
     this.onVisibility = () => {
       cancelAnimationFrame(this.frame);
       this.frame = null;
+      if (document.hidden) {
+        this.controls.cancel?.();
+        this.cancelPointerInput();
+      }
       if (!document.hidden) {
         this.lastTime = performance.now();
         this.frame = requestAnimationFrame((time) => this.animate(time));
@@ -134,6 +120,30 @@ export class SurveyScene {
     };
     document.addEventListener("visibilitychange", this.onVisibility);
     this.frame = requestAnimationFrame((time) => this.animate(time));
+  }
+
+  // 平面与立体场景在绑定输入前选择控制器，避免重复监听拖拽事件。
+  createControls() {
+    const controls = new OrbitControls(this.camera, this.renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.1;
+    controls.enablePan = true;
+    controls.minPolarAngle = 0.05;
+    controls.maxPolarAngle = Math.PI * 0.36;
+    controls.minZoom = 0.65;
+    controls.maxZoom = 5;
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: null,
+    };
+    controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN,
+    };
+    controls.rotateSpeed = 0.55;
+    controls.zoomSpeed = 0.8;
+    return controls;
   }
 
   // Rebuild from a snapshot with hidden mines masked; release old geometry and materials before starting a new board.
@@ -946,20 +956,27 @@ export class SurveyScene {
         this.callbacks.onFlag(state.id);
       else if (event.button === 0) this.callbacks.onReveal(state.id);
     });
-    canvas.addEventListener("pointercancel", (event) => {
-      this.pointers.delete(event.pointerId);
-      this.pointerState = null;
-      this.hoverId = -1;
-      this.focusId = -1;
-      this.drawTiles();
-      clearTimeout(this.longPressTimer);
-    });
+    canvas.addEventListener("pointercancel", () => this.cancelPointerInput());
     canvas.addEventListener("dblclick", (event) => {
       if (performance.now() < (this.suppressDoubleClickUntil || 0)) return;
       const id = this.pick(event);
       if (id >= 0) this.callbacks.onChord(id);
     });
     this.controls.addEventListener("change", () => this.updateLabels());
+    this.controls.addEventListener("cancel", () => this.cancelPointerInput());
+  }
+
+  // 控件与棋盘共用取消路径，避免失焦或丢失捕获后继续触发长按标记。
+  cancelPointerInput() {
+    clearTimeout(this.longPressTimer);
+    this.pointers.clear();
+    this.pointerState = null;
+    this.hoverId = -1;
+    this.focusId = -1;
+    if (!this.disposed) {
+      this.drawTiles();
+      this.callbacks.onHover(-1);
+    }
   }
 
   animate(time) {
