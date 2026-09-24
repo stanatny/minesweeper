@@ -164,6 +164,39 @@ h2 {
   display: flex;
   gap: 6px;
 }
+/* 语言选项保留英文与中文自称，切换后仍容易辨认。 */
+.language-control {
+  position: relative;
+  display: block;
+  align-self: center;
+  flex: 0 0 76px;
+  width: 76px;
+  margin-right: 4px;
+}
+#language-select {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 20px 0 8px;
+  border-color: var(--line);
+  border-radius: 6px;
+  font-size: 11px;
+  letter-spacing: 0;
+  color: var(--muted);
+  background-color: var(--surface);
+}
+#language-select:hover {
+  color: var(--ink);
+  background-color: var(--surface-hover);
+}
+.language-control > svg {
+  position: absolute;
+  top: 12px;
+  right: 6px;
+  width: 12px;
+  height: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
 .icon-button {
   width: 42px;
   height: 42px;
@@ -244,7 +277,7 @@ h2 {
   font-weight: 400;
   letter-spacing: 1px;
 }
-.field-label > span {
+.field-label > span:not(.field-label-text) {
   font-family: var(--font-data);
   color: var(--quiet);
   font-size: 8px;
@@ -322,7 +355,7 @@ select option {
 .text-button:hover {
   color: #d8fbff;
 }
-.text-button > span {
+.text-button > span[aria-hidden="true"] {
   font-size: 20px;
   font-weight: 300;
 }
@@ -585,7 +618,7 @@ select option {
   font-size: 10px;
   letter-spacing: 0.5px;
 }
-.scene-hint span span {
+.scene-hint span span[aria-hidden="true"] {
   display: inline-block;
   padding: 0 8px;
   color: #3e535e;
@@ -989,7 +1022,7 @@ kbd {
   .scene-hint {
     font-size: 9px;
   }
-  .scene-hint span span {
+  .scene-hint span span[aria-hidden="true"] {
     padding: 0 2px;
   }
 }
@@ -1050,7 +1083,7 @@ kbd {
     margin-top: 0;
     min-width: 0;
   }
-  .region-settings .field-label > span {
+  .region-settings .field-label > span:not(.field-label-text) {
     display: none;
   }
   .select-wrap {
@@ -1074,7 +1107,7 @@ kbd {
     white-space: nowrap;
     letter-spacing: 0.5px;
   }
-  .telemetry .field-label > span {
+  .telemetry .field-label > span:not(.field-label-text) {
     display: none;
   }
   .stat-value {
@@ -1176,7 +1209,7 @@ kbd {
     font-size: 9px;
     letter-spacing: 0;
   }
-  .scene-hint span span {
+  .scene-hint span span[aria-hidden="true"] {
     padding: 0 2px;
   }
   #cell-readout {
@@ -1480,11 +1513,11 @@ kbd {
   }
 }
 
-/* Keep independent music and sound controls reachable alongside the other header actions on small screens. */
+/* 窄屏保留独立音频按钮与语言切换，不增加页头高度。 */
 .music-button[aria-pressed="true"] .music-off {
   display: none;
 }
-@media (max-width: 460px) {
+@media (max-width: 560px) {
   .masthead {
     gap: 8px;
   }
@@ -1498,34 +1531,54 @@ kbd {
     height: 42px;
     padding: 8px;
   }
-  .brand-name {
-    font-size: 14px;
-    letter-spacing: 1.3px;
+  .language-control {
+    width: 64px;
+    flex-basis: 64px;
   }
-  .brand-caption {
-    letter-spacing: 1.5px;
+  #language-select {
+    padding-left: 7px;
+    padding-right: 17px;
+    font-size: 10px;
   }
-  .brand-symbol {
-    width: 23px;
+  .language-control > svg {
+    right: 4px;
   }
-  .brand {
-    gap: 7px;
-  }
-}
-@media (max-width: 360px) {
   .brand-name {
     font-size: 12px;
     letter-spacing: 0.8px;
   }
+  .brand-slash {
+    padding: 0 3px;
+  }
   .brand-caption {
     font-size: 7px;
-    letter-spacing: 0.7px;
+    letter-spacing: 1.1px;
   }
   .brand-symbol {
-    width: 19px;
+    width: 20px;
   }
   .brand {
     gap: 5px;
+  }
+}
+@media (max-width: 360px) {
+  .language-control {
+    width: 60px;
+    flex-basis: 60px;
+  }
+  #language-select {
+    padding-left: 5px;
+    font-size: 9.5px;
+  }
+  .brand-name {
+    font-size: 11.5px;
+    letter-spacing: 0.4px;
+  }
+  .brand-caption {
+    letter-spacing: 0.7px;
+  }
+  .brand-symbol {
+    display: none;
   }
 }
 

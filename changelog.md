@@ -4,6 +4,7 @@
 
 ### Added
 
+- English and Simplified Chinese interface options, covering controls, help, game status, validation messages, and accessibility labels. English is the first-visit default; the selected language is saved when browser storage is available, and switching preserves the current game.
 - The Sun, all eight planets, and Pluto distributed around the surrounding sky, with distinct procedural surfaces, Saturn rings, and a soft solar corona.
 - Copper minefield covers with deep smoked-umber revealed faces, pale cream-gold numbers, and coordinated hover, focus, and marking colors across planar, faceted, and compatibility views.
 - A Milky Way dust band and occasional meteor trails; the surrounding sky follows camera rotation behind both field types, maintains its angular scale during board zoom, and respects reduced motion.

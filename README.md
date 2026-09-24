@@ -18,6 +18,8 @@ The [GitHub Pages version](https://stanatny.github.io/minesweeper/) follows the 
 
 The default **Carved cube** starts with **75% recess depth, 216 tiles, and 30 cores**. Explore the stepped corners immediately, or choose **Field type → Planar ruin** for the classic rectangular layout.
 
+Choose **English** or **中文** from the language selector. The first visit uses English regardless of the browser's language. Your selection is remembered when browser storage is available; if storage is blocked, switching still works for the current visit. Changing language updates controls, help, status messages, and accessibility labels while preserving the current survey and settings. Both translations are bundled locally, including in compatibility mode. Keyboard shortcuts remain the same in either language.
+
 ### Controls
 
 | Action           | Input                                                                                                                       |
@@ -76,6 +78,8 @@ Requires Node.js 22 or later and npm. Browser tests use a locally installed Goog
 npm ci
 npm run build
 npm test
+npm run test:i18n
+npm run test:i18n:browser
 # Start the static server on port 8765 in another terminal before browser tests.
 npm run test:browser
 npm run test:polish
@@ -88,12 +92,15 @@ npm run test:cosmos
 npm run test:celestial
 ```
 
+Interface messages live in `js/locales/en.json` and `js/locales/zh_cn.json`. Keep the same keys and `{parameter}` placeholders in both files; `npm run test:i18n` checks their consistency. Static markup uses `data-i18n` attributes, and dynamic messages are bound to translation keys without rebuilding the game. No translation service or runtime locale download is required.
+
 After editing `js/`, run `npm run build` and refresh the page. The browser loads `dist/explorer.js`, rather than the source modules. Build artifacts are checked in to support direct opening and static hosting.
 
 ### Structure and assets
 
 - `index.html`, `css/style.css`: Responsive mission interface and accessible controls.
 - `js/explorer.js`: Input, timing, difficulty, game status, and compatibility mode.
+- `js/i18n.js`, `js/locales/`: English and Simplified Chinese interface messages, parameter interpolation, and persisted language selection.
 - `js/game_engine.js`: Independent Minesweeper state engine.
 - `js/surface_topology.js`: Deterministic carved solids with unit-square tiles, shared-corner adjacency, and independently controlled tile count and recess depth.
 - `js/surface_scene.js`: Equal square plates, face-aligned numbers, full-object orbiting, occlusion-aware picking, neighbor highlighting, and face-oriented mines and flame jets.

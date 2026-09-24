@@ -3,13 +3,17 @@ import { SurveyScene } from "./survey_scene.js";
 import { SurveyAudio } from "./survey_audio.js";
 import { SurfaceScene } from "./surface_scene.js";
 import { createSurface } from "./surface_topology.js";
+import { createI18n } from "./i18n.js";
 
 const PRESETS = {
   beginner: { width: 9, height: 9, mines: 10 },
   intermediate: { width: 16, height: 16, mines: 40 },
   expert: { width: 30, height: 16, mines: 99 },
 };
-const FACE_NAMES = ["Right", "Left", "Up", "Down", "Front", "Back"];
+const FACE_NAMES = ["right", "left", "up", "down", "front", "back"];
+const i18n = createI18n();
+const { t } = i18n;
+const messageBindings = new Map();
 const $ = (id) => document.getElementById(id);
 const isLocalTest =
   ["localhost", "127.0.0.1"].includes(location.hostname) &&
@@ -57,7 +61,7 @@ function startGame(nextConfig = config) {
   updateHUD();
   updateAccessibleBoard();
   $("timer").textContent = "00:00";
-  $("cell-readout").textContent = "Choose a tile to begin";
+  message("cell-readout", "game.choose");
 }
 
 function syncWorldControls() {
@@ -67,29 +71,44 @@ function syncWorldControls() {
   $("plane-settings").hidden = surface;
   $("surface-settings").hidden = !surface;
   const topology = model.topology;
-  $("surface-current").textContent = surface
-    ? `Current: ${Math.round(topology.irregularity * 100)}% depth · ${topology.cellCount} tiles · ${model.mines} cores`
-    : "";
-  $("surface-summary").textContent = surface
-    ? `${topology.cellCount} tiles · ${model.mines} cores`
-    : "216 tiles · 30 cores";
-  $("surface-current").title = surface ? `Shape seed: ${topology.seed}` : "";
-  $("field-title").textContent = surface ? "Carved cube" : "Planar ruin";
-  $("field-hint").textContent = surface
-    ? "Drag to explore every side"
-    : "Drag to orbit · Scroll to zoom";
-  document.querySelector(".mission-intro h1").innerHTML = surface
-    ? "Beyond the flat.<span>Into the corners.</span>"
-    : "Chart the <span>unknown.</span>";
-  document.querySelector(".mission-description").innerHTML = surface
-    ? "A cube carved for discovery.<br />Follow the clues into every recess."
-    : "A dormant relic.<br />Every number points to safety.";
-  stage.setAttribute(
-    "aria-label",
+  message(
+    "surface-current",
+    surface ? "game.surface.current" : null,
     surface
-      ? "Faceted minesweeper solid. Drag to orbit every side. Arrow keys follow neighboring tiles; Enter explores; F marks."
-      : "3D minesweeper board. Arrow keys select; Enter explores; F marks; V toggles top view.",
+      ? {
+          depth: Math.round(topology.irregularity * 100),
+          count: topology.cellCount,
+          mines: model.mines,
+        }
+      : {},
   );
+  message("surface-summary", "game.surface.summary", {
+    count: topology?.cellCount ?? 216,
+    mines: surface ? model.mines : 30,
+  });
+  message(
+    "surface-current",
+    surface ? "game.surface.seed" : null,
+    { seed: topology?.seed },
+    "title",
+  );
+  message("field-title", surface ? "game.field.surface" : "game.field.plane");
+  message("field-hint", surface ? "game.hint.surface" : "game.hint.orbit");
+  const heading = document.querySelector(".mission-intro h1");
+  const first = document.createTextNode("");
+  const second = document.createElement("span");
+  heading.replaceChildren(first, second);
+  const field = surface ? "surface" : "plane";
+  message(first, `game.intro.${field}.first`);
+  message(second, `game.intro.${field}.second`);
+  const description = document.querySelector(".mission-description");
+  const lead = document.createTextNode("");
+  const detail = document.createTextNode("");
+  description.replaceChildren(lead, document.createElement("br"), detail);
+  message(lead, `game.intro.${field}.lead`);
+  message(detail, `game.intro.${field}.detail`);
+  message(stage, `game.aria.stage.${field}`, {}, "aria-label");
+  pruneMessages();
 }
 
 function mountScene() {
@@ -144,28 +163,44 @@ function surfaceDraft() {
 function updateSurfaceDraft() {
   const draft = surfaceDraft();
   const count = 6 * draft.resolution ** 2;
-  $("surface-area-value").textContent = `${count} tiles`;
-  $("surface-area").setAttribute("aria-valuetext", `${count} tiles`);
-  $("surface-irregularity-value").textContent =
-    draft.shape === "cube" ? "Off" : `${Math.round(draft.irregularity * 100)}%`;
-  $("surface-irregularity").disabled = draft.shape === "cube";
-  $("surface-relief-hint").textContent =
-    draft.shape === "cube"
-      ? "Choose a carved style in More settings to add recesses."
-      : draft.irregularity === 0
-        ? "No recesses. Increase depth to carve the corners."
-        : draft.irregularity >= 0.85
-          ? "Deep main cuts with extra recesses at other corners."
-          : "Deepen opposite corners. Every tile stays the same size.";
-  $("surface-irregularity").setAttribute(
-    "aria-valuetext",
-    draft.shape === "cube"
-      ? "Off for regular cube"
-      : `${Math.round(draft.irregularity * 100)} percent recess depth`,
+  const depth = Math.round(draft.irregularity * 100);
+  message("surface-area-value", "game.surface.tiles", { count });
+  message("surface-area", "game.surface.tiles", { count }, "aria-valuetext");
+  message(
+    "surface-irregularity-value",
+    draft.shape === "cube" ? "game.off" : "game.percent",
+    { value: depth },
   );
-  $("surface-density-value").textContent =
-    `${draft.density}% · ${Math.floor((count * draft.density) / 100)} cores`;
-  $("surface-draft-note").textContent = "Generate to apply draft.";
+  $("surface-irregularity").disabled = draft.shape === "cube";
+  const hint =
+    draft.shape === "cube"
+      ? "regular"
+      : draft.irregularity === 0
+        ? "zero"
+        : draft.irregularity >= 0.85
+          ? "deep"
+          : "opposite";
+  message("surface-relief-hint", `game.relief.${hint}`);
+  message(
+    "surface-irregularity",
+    draft.shape === "cube" ? "game.relief.off" : "game.relief.value",
+    { depth },
+    "aria-valuetext",
+  );
+  message("surface-density-value", "game.surface.density", {
+    density: draft.density,
+    mines: Math.floor((count * draft.density) / 100),
+  });
+  message(
+    "surface-density",
+    "game.surface.density",
+    {
+      density: draft.density,
+      mines: Math.floor((count * draft.density) / 100),
+    },
+    "aria-valuetext",
+  );
+  message("surface-draft-note", "game.draft.apply");
 }
 
 function generateSurfaceConfig() {
@@ -183,7 +218,7 @@ function generateSurfaceConfig() {
 function act(action, id) {
   if (!Number.isInteger(id) || id < 0 || id >= model.cells.length) return;
   if (action === "flag" && model.status === "ready") {
-    toast("Explore a tile before marking suspected cores.");
+    toast("game.mark_guard");
     return;
   }
   const before = model.status;
@@ -207,9 +242,8 @@ function act(action, id) {
   if (result.action !== "lose" || !scene) audio.play(result.action);
   if (model.status !== lastStatus && ["won", "lost"].includes(model.status)) {
     if (model.status === "lost" && scene?.detonation.active) {
-      $("status-label").textContent = "Chain reaction";
-      $("status-description").textContent =
-        "The blast is spreading. Cores will detonate one by one.";
+      message("status-label", "game.chain.title");
+      message("status-description", "game.chain.description");
     } else showResult();
   }
   lastStatus = model.status;
@@ -228,52 +262,40 @@ function updateHUD() {
     "aria-valuenow",
     String(progress),
   );
-  const text = {
-    ready: [
-      "Ready to explore",
-      "Choose any tile. Your first move and its neighbors are safe.",
-    ],
-    playing: [
-      "Survey in progress",
-      "Numbers count cores in the eight neighboring tiles. Mark suspected cores.",
-    ],
-    won: ["Sector cleared", "All safe tiles explored. Every core is marked."],
-    lost: [
-      "Core triggered",
-      "Review the revealed cores, then start a new survey.",
-    ],
-  }[model.status];
-  if (model.topology && model.status === "playing")
-    text[1] =
-      "Numbers count touching tiles across the surface. Rotate to explore every side.";
-  if (model.topology && model.status === "ready")
-    text[1] =
-      "Choose any tile. Hover to see its neighbors; drag to explore every side.";
-  $("status-label").textContent = text[0];
-  $("status-description").textContent = text[1];
+  message("status-label", `game.status.${model.status}.title`);
+  const field =
+    model.topology && ["ready", "playing"].includes(model.status)
+      ? ".surface"
+      : "";
+  message(
+    "status-description",
+    `game.status.${model.status}${field}.description`,
+  );
   document.body.dataset.gameState = model.status;
   if ($("sector-size"))
-    $("sector-size").textContent = model.topology
-      ? `${model.cells.length} surface tiles`
-      : `${model.width} × ${model.height}`;
-  if ($("sector-mines")) $("sector-mines").textContent = `${model.mines} cores`;
+    message(
+      "sector-size",
+      model.topology ? "game.surface.size" : "game.plane.size",
+      {
+        count: model.cells.length,
+        width: model.width,
+        height: model.height,
+      },
+    );
+  if ($("sector-mines"))
+    message("sector-mines", "game.mines", { mines: model.mines });
 }
 
 function showResult() {
-  const won = model.status === "won";
-  $("result-title").textContent = won
-    ? "Silence restored."
-    : "Survey interrupted.";
-  $("result-description").textContent = won
-    ? `All ${model.revealedCount} safe tiles explored in ${formatTime(elapsed)}.`
-    : `${model.revealedCount} safe tiles explored in ${formatTime(elapsed)}. All core locations are now visible.`;
+  const result = model.status === "won" ? "won" : "lost";
+  message("result-title", `game.result.${result}.title`);
+  message("result-description", `game.result.${result}.description`, {
+    count: model.revealedCount,
+    time: formatTime(elapsed),
+  });
   $("result-panel").hidden = false;
   $("result-panel").dataset.outcome = model.status;
-  toast(
-    won
-      ? "Survey complete · all safe tiles explored"
-      : "Core triggered · full layout revealed",
-  );
+  toast(`game.result.${result}.toast`);
 }
 
 function setMode(next) {
@@ -286,37 +308,50 @@ function setMode(next) {
 
 function updateReadout(id) {
   if (id < 0 || !model?.cells[id]) {
-    $("cell-readout").textContent =
-      model?.status === "ready"
-        ? "Choose a tile to begin"
-        : "Drag to orbit · Scroll to zoom";
+    message(
+      "cell-readout",
+      model?.status === "ready" ? "game.choose" : "game.hint.orbit",
+    );
     return;
   }
   const cell = model.snapshot().cells[id];
-  const label = cell.revealed
-    ? cell.mine
-      ? "Unstable core"
-      : cell.adjacent
-        ? `${cell.adjacent} nearby core${cell.adjacent === 1 ? "" : "s"}`
-        : "Safe tile"
-    : cell.flagged
-      ? "Marked"
-      : "Unexplored";
-  $("cell-readout").textContent = model.topology
-    ? `Tile ${cell.id + 1} / ${label} · ${model.neighbors(id).length} neighbors`
-    : `${String(cell.x + 1).padStart(2, "0")} : ${String(cell.y + 1).padStart(2, "0")} / ${label}`;
+  message(
+    "cell-readout",
+    model.topology ? "game.readout.surface" : "game.readout.plane",
+    () => ({
+      id: cell.id + 1,
+      label: cellDescription(cell, true),
+      neighbors: model.neighbors(id).length,
+      x: String(cell.x + 1).padStart(2, "0"),
+      y: String(cell.y + 1).padStart(2, "0"),
+    }),
+  );
+}
+
+function cellDescription(cell, readout = false) {
+  if (cell.wrongFlag && !readout) return t("game.cell.wrong");
+  if (cell.revealed) {
+    if (cell.mine) return t("game.cell.mine");
+    if (!cell.adjacent && readout) return t("game.cell.safe");
+    return t(
+      cell.adjacent === 1 ? "game.cell.nearby_one" : "game.cell.nearby_other",
+      { count: cell.adjacent },
+    );
+  }
+  return t(cell.flagged ? "game.cell.marked" : "game.cell.covered");
 }
 
 function buildAccessibleBoard() {
   const board = $("board-accessibility");
   board.innerHTML = "";
   board.setAttribute("role", "grid");
-  board.setAttribute(
+  message(
+    board,
+    model.topology ? "game.aria.board.surface" : "game.aria.board.plane",
+    {},
     "aria-label",
-    model.topology
-      ? "Faceted minesweeper solid. Arrow keys follow touching tiles across faces. Enter explores and F marks."
-      : "Minesweeper grid. Use the arrow keys to select a tile, Enter to explore, and F to mark.",
   );
+  pruneMessages();
   board.setAttribute("aria-rowcount", String(model.height));
   board.setAttribute("aria-colcount", String(model.width));
   board.style.setProperty("--columns", model.width);
@@ -326,7 +361,10 @@ function buildAccessibleBoard() {
       const heading = document.createElement("div");
       heading.className = "surface-face-label";
       heading.setAttribute("role", "presentation");
-      heading.textContent = `${FACE_NAMES[Math.floor(y / model.topology.resolution)]}-facing tiles`;
+      const face = FACE_NAMES[Math.floor(y / model.topology.resolution)];
+      message(heading, "game.face.heading", () => ({
+        face: t(`game.face.${face}`),
+      }));
       board.appendChild(heading);
     }
     const row = document.createElement("div");
@@ -361,23 +399,21 @@ function updateAccessibleBoard(changed = model.cells.map((cell) => cell.id)) {
   for (const id of changed) {
     const cell = snapshot.cells[id];
     const button = cellButtons[id];
-    const description = cell.wrongFlag
-      ? "Incorrect mark"
-      : cell.revealed
-        ? cell.mine
-          ? "Unstable core"
-          : `${cell.adjacent} nearby core${cell.adjacent === 1 ? "" : "s"}`
-        : cell.flagged
-          ? "Marked"
-          : "Unexplored";
-    button.setAttribute(
+    message(
+      button,
+      model.topology ? "game.aria.cell.surface" : "game.aria.cell.plane",
+      () => ({
+        face: t(`game.face.${FACE_NAMES[cell.face]}`),
+        id: cell.id + 1,
+        description: cellDescription(cell),
+        neighbors: model
+          .neighbors(id)
+          .map((neighbor) => neighbor + 1)
+          .join(", "),
+        row: cell.y + 1,
+        column: cell.x + 1,
+      }),
       "aria-label",
-      model.topology
-        ? `${FACE_NAMES[cell.face]}-facing tile ${cell.id + 1}: ${description}. Neighbors ${model
-            .neighbors(id)
-            .map((neighbor) => neighbor + 1)
-            .join(", ")}.`
-        : `Row ${cell.y + 1}, column ${cell.x + 1}: ${description}`,
     );
     button.dataset.state = cell.wrongFlag
       ? "wrong"
@@ -480,10 +516,10 @@ function enableFallback(error) {
   $("fallback-board").hidden = false;
   $("fallback-board").appendChild($("board-accessibility"));
   $("board-accessibility").classList.remove("sr-only");
-  $("scene-status").textContent = "3D unavailable · The grid is ready to play.";
-  if (model?.topology)
-    $("scene-status").textContent =
-      "3D unavailable · Direction atlas enabled. Neighbors still connect across faces.";
+  message(
+    "scene-status",
+    model?.topology ? "game.fallback.surface" : "game.fallback.plane",
+  );
   $("scene-status").hidden = false;
   $("reset-camera").disabled = true;
   $("top-view").disabled = true;
@@ -493,9 +529,9 @@ function enableFallback(error) {
   }
 }
 
-function toast(message) {
+function toast(key, params = {}) {
   clearTimeout(toastTimer);
-  $("toast").textContent = message;
+  message("toast", key, params);
   $("toast").hidden = false;
   toastTimer = setTimeout(() => {
     $("toast").hidden = true;
@@ -505,8 +541,8 @@ function toast(message) {
 function confirmReset(description) {
   if (model.status !== "playing") return Promise.resolve(true);
   if (pendingConfirmation) return Promise.resolve(false);
-  $("confirm-title").textContent = "Start a new survey?";
-  $("confirm-description").textContent = description;
+  message("confirm-title", "game.confirm.title");
+  message("confirm-description", description);
   $("confirm-dialog").showModal();
   return new Promise((resolve) => {
     pendingConfirmation = resolve;
@@ -521,8 +557,64 @@ function finishConfirmation(value) {
 }
 
 async function restart() {
-  if (await confirmReset("This will reset the board, marks, and timer."))
-    startGame();
+  if (await confirmReset("game.confirm.restart")) startGame();
+}
+
+function message(target, key, params = {}, attribute = "textContent") {
+  const element = typeof target === "string" ? $(target) : target;
+  if (!messageBindings.has(element)) messageBindings.set(element, new Map());
+  const bindings = messageBindings.get(element);
+  if (key) bindings.set(attribute, { key, params });
+  else bindings.delete(attribute);
+  const value = key
+    ? t(key, typeof params === "function" ? params() : params)
+    : "";
+  if (attribute === "textContent") element.textContent = value;
+  else element.setAttribute(attribute, value);
+}
+
+function pruneMessages() {
+  for (const element of messageBindings.keys())
+    if (!element.isConnected) messageBindings.delete(element);
+}
+
+function refreshLanguage() {
+  i18n.translatePage();
+  $("language-select").value = i18n.getLocale();
+  pruneMessages();
+  for (const [element, bindings] of messageBindings) {
+    for (const [attribute, { key, params }] of bindings)
+      message(element, key, params, attribute);
+  }
+}
+
+function updateAudioLabels() {
+  for (const name of ["sound", "music"]) {
+    const enabled = $(`${name}-toggle`).getAttribute("aria-pressed") === "true";
+    const key = `game.audio.${name}.${enabled ? "mute" : "unmute"}`;
+    message(`${name}-toggle`, key, {}, "aria-label");
+    message(`${name}-toggle`, key, {}, "title");
+    const label = $(`${name}-toggle`).querySelector("[data-sound-label]");
+    if (label) message(label, `game.audio.${enabled ? "on" : "off"}`);
+  }
+}
+
+function unlockGameplayAudio(event) {
+  if (!event.target.closest?.("#language-select")) void audio.unlock();
+}
+
+function errorMessage(error) {
+  if (error?.message === "Width must be an integer between 5 and 50")
+    return "game.error.width";
+  if (error?.message === "Height must be an integer between 5 and 30")
+    return "game.error.height";
+  if (error?.message?.startsWith("Mines must be an integer between 1 and"))
+    return "game.error.mines";
+  return "game.error.generic";
+}
+
+function showError(target, error) {
+  message(target, errorMessage(error));
 }
 
 function formatTime(seconds) {
@@ -541,16 +633,17 @@ function testRandom() {
 // Unlock audio after real input and clear keyboard focus when using a pointer.
 document.addEventListener(
   "pointerdown",
-  () => {
+  (event) => {
+    if (event.target.closest?.("#language-select")) return;
     scene?.clearFocus();
     void audio.unlock();
   },
   { capture: true },
 );
-document.addEventListener("pointerup", () => void audio.unlock(), {
+document.addEventListener("pointerup", unlockGameplayAudio, {
   capture: true,
 });
-document.addEventListener("keydown", () => void audio.unlock(), {
+document.addEventListener("keydown", unlockGameplayAudio, {
   capture: true,
 });
 
@@ -567,26 +660,14 @@ $("top-view").addEventListener("click", () => {
 $("sound-toggle").addEventListener("click", () => {
   const enabled = $("sound-toggle").getAttribute("aria-pressed") !== "true";
   $("sound-toggle").setAttribute("aria-pressed", String(enabled));
-  $("sound-toggle").setAttribute(
-    "aria-label",
-    enabled ? "Mute sound effects" : "Unmute sound effects",
-  );
-  $("sound-toggle").title = enabled
-    ? "Mute sound effects"
-    : "Unmute sound effects";
-  const label = $("sound-toggle").querySelector("[data-sound-label]");
-  if (label) label.textContent = enabled ? "Sound on" : "Sound off";
+  updateAudioLabels();
   audio.setEnabled(enabled);
   audio.play("flag");
 });
 $("music-toggle").addEventListener("click", () => {
   const enabled = $("music-toggle").getAttribute("aria-pressed") !== "true";
   $("music-toggle").setAttribute("aria-pressed", String(enabled));
-  $("music-toggle").setAttribute(
-    "aria-label",
-    enabled ? "Mute music" : "Unmute music",
-  );
-  $("music-toggle").title = enabled ? "Mute music" : "Unmute music";
+  updateAudioLabels();
   audio.setMusicEnabled(enabled);
 });
 $("help-btn").addEventListener("click", () => $("help-dialog").showModal());
@@ -610,9 +691,9 @@ $("settings-btn").addEventListener("click", () => {
 $("preset-select").addEventListener("change", async () => {
   const nextPreset = $("preset-select").value;
   $("custom-inputs").hidden = nextPreset !== "custom";
-  $("config-error").textContent = "";
+  message("config-error", null);
   if (nextPreset === "custom") return;
-  if (await confirmReset("Changing sectors will reset your current survey.")) {
+  if (await confirmReset("game.confirm.preset")) {
     activePreset = nextPreset;
     planeConfig = PRESETS[nextPreset];
     startGame(planeConfig);
@@ -630,15 +711,11 @@ $("apply-btn").addEventListener("click", async () => {
   try {
     new Minefield(custom);
   } catch (error) {
-    $("config-error").textContent = error.message;
+    showError("config-error", error);
     return;
   }
-  $("config-error").textContent = "";
-  if (
-    await confirmReset(
-      "Applying these settings will reset your current survey.",
-    )
-  ) {
+  message("config-error", null);
+  if (await confirmReset("game.confirm.custom")) {
     activePreset = "custom";
     planeConfig = custom;
     startGame(planeConfig);
@@ -657,9 +734,7 @@ $("board-mode").addEventListener("change", async () => {
   const requested = $("board-mode").value;
   const current = model.topology ? "surface" : "plane";
   if (requested === current) return;
-  if (
-    !(await confirmReset("Changing the field type will start a new survey."))
-  ) {
+  if (!(await confirmReset("game.confirm.mode"))) {
     $("board-mode").value = current;
     return;
   }
@@ -670,37 +745,29 @@ $("board-mode").addEventListener("change", async () => {
     } else startGame(planeConfig);
   } catch (error) {
     $("board-mode").value = current;
-    $("config-error").textContent = error.message;
-    toast(error.message);
+    showError("config-error", error);
+    toast(errorMessage(error));
   }
 });
 $("surface-generate").addEventListener("click", async () => {
-  if (
-    !(await confirmReset(
-      "Generating a new solid will reset this survey, marks, and timer.",
-    ))
-  )
-    return;
+  if (!(await confirmReset("game.confirm.generate"))) return;
   try {
     const next = generateSurfaceConfig();
     new Minefield(next);
-    $("surface-error").textContent = "";
+    message("surface-error", null);
     surfaceConfig = next;
     startGame(surfaceConfig);
-    $("surface-draft-note").textContent = "New cube ready.";
+    message("surface-draft-note", "game.draft.ready");
     if (matchMedia("(max-width: 760px)").matches)
       $("surface-generator").open = false;
   } catch (error) {
-    $("surface-error").textContent = error.message;
+    showError("surface-error", error);
   }
 });
 
 stage.tabIndex = 0;
 stage.setAttribute("role", "group");
-stage.setAttribute(
-  "aria-label",
-  "3D minesweeper board. Arrow keys select; Enter explores; F marks; V toggles top view.",
-);
+
 stage.addEventListener("focus", () => {
   if (stage.matches(":focus-visible")) scene?.focus(focusId);
 });
@@ -766,10 +833,16 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+$("language-select").addEventListener("change", () => {
+  i18n.setLocale($("language-select").value);
+  refreshLanguage();
+});
+refreshLanguage();
+updateAudioLabels();
 updateSurfaceDraft();
 surfaceConfig = generateSurfaceConfig();
 startGame(surfaceConfig);
-$("surface-draft-note").textContent = "Ready to explore.";
+message("surface-draft-note", "game.draft.initial");
 mountScene();
 
 setInterval(() => {
