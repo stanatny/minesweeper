@@ -50,7 +50,7 @@ export function planOrbitGesture(state, target) {
 export async function orbitToDirection(
   page,
   direction,
-  { minDot = 0.9999995, steps = 16, stepDelay = 0 } = {},
+  { minDot = 0.9999995, steps = 16, stepDelay = 0, touchSession = null } = {},
 ) {
   assert.ok(direction.length === 3 && direction.every(Number.isFinite));
   assert.ok(Math.hypot(...direction) > 0);
@@ -82,31 +82,53 @@ export async function orbitToDirection(
     if (gesture.cosine >= minDot) break;
     const length = Math.hypot(gesture.dx, gesture.dy);
     assert.ok(length > 0, "An unfinished orbit must have a nonzero gesture");
-    await page.mouse.move(gesture.x, gesture.y);
-    await page.mouse.down();
+    const move = async (x, y, count = 1) => {
+      if (touchSession)
+        await touchSession.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x, y, id: 1 }],
+        });
+      else await page.mouse.move(x, y, { steps: count });
+    };
+    if (touchSession)
+      await touchSession.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x: gesture.x, y: gesture.y, id: 1 }],
+      });
+    else {
+      await page.mouse.move(gesture.x, gesture.y);
+      await page.mouse.down();
+    }
     try {
       // 微调也先越过点击容差再沿原路收回，避免一次补偿手势误开格子。
       if (length < 8) {
-        await page.mouse.move(
+        await move(
           gesture.x + (gesture.dx * 8) / length,
           gesture.y + (gesture.dy * 8) / length,
         );
       }
-      if (stepDelay > 0 && length >= 8) {
+      if ((stepDelay > 0 || touchSession) && length >= 8) {
         for (let step = 1; step <= steps; step++) {
-          await page.mouse.move(
+          await move(
             gesture.x + (gesture.dx * step) / steps,
             gesture.y + (gesture.dy * step) / steps,
           );
-          await page.waitForTimeout(stepDelay);
+          if (stepDelay > 0) await page.waitForTimeout(stepDelay);
         }
       } else {
-        await page.mouse.move(gesture.x + gesture.dx, gesture.y + gesture.dy, {
-          steps: length < 8 ? 1 : steps,
-        });
+        await move(
+          gesture.x + gesture.dx,
+          gesture.y + gesture.dy,
+          length < 8 ? 1 : steps,
+        );
       }
     } finally {
-      await page.mouse.up();
+      if (touchSession)
+        await touchSession.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+      else await page.mouse.up();
     }
     gestures.push(gesture);
     // 等真实惯性抵达本次手势的预期方向，不等待任何固定的欧拉角。

@@ -7,7 +7,7 @@
  */
 export function createSurface({
   resolution = 6,
-  irregularity = 0.45,
+  irregularity = 0.75,
   shape = "stepped",
   seed = 1,
 } = {}) {
@@ -152,55 +152,72 @@ export function createSurface({
   });
 }
 
-// Opposite corner cuts stay on separate sides of full-height central walls.
-// Both vertical bounds are monotone in x/z, so every axis ray intersects one nonempty solid interval.
+// 上方切削只占 +Z 半区，下方只占 -Z 半区；中央完整十字墙始终保留。
+// 每个半区可从 X 两端切入，但不能越过中央墙，因此所有轴射线仍是非空单区间。
 function createVerticalBounds(n, irregularity, shape, random) {
   const floors = new Uint8Array(n * n);
   const ceilings = new Uint8Array(n * n).fill(n);
-  if (shape === "cube" || irregularity === 0) return { floors, ceilings };
+  const result = { floors, ceilings };
+  if (shape === "cube" || irregularity === 0) return result;
   const middle = Math.floor((n - 1) / 2);
-  const upperCuts = createCornerCuts(
-    n,
-    irregularity,
-    shape,
-    random,
-    n - middle - 1,
-  );
-  const lowerCuts = createCornerCuts(n, irregularity, shape, random, middle);
-  // Use spare footprint space to distinguish an accidental match without thinning the central walls.
-  if (
-    upperCuts[0].width < n - middle - 1 &&
-    JSON.stringify(upperCuts) === JSON.stringify(lowerCuts)
-  )
-    upperCuts[0].width += 1;
-  for (const cut of upperCuts) {
-    for (let z = n - cut.length; z < n; z += 1) {
-      for (let x = n - cut.width; x < n; x += 1) {
-        ceilings[x + n * z] -= cut.depth;
+  const positiveCapacity = n - middle - 1;
+  const primaryDepth = Math.max(1, Math.round(irregularity * (n - 1)));
+  const addRegion = (corner, depth, relief) => {
+    const widthCapacity = corner[0] > 0 ? positiveCapacity : middle;
+    const lengthCapacity = corner[2] > 0 ? positiveCapacity : middle;
+    const cuts = createCornerCuts(
+      depth,
+      relief,
+      shape,
+      random,
+      widthCapacity,
+      lengthCapacity,
+    );
+    for (const cut of cuts) {
+      for (let dz = 0; dz < cut.length; dz += 1) {
+        for (let dx = 0; dx < cut.width; dx += 1) {
+          const x = corner[0] > 0 ? n - 1 - dx : dx;
+          const z = corner[2] > 0 ? n - 1 - dz : dz;
+          const column = x + n * z;
+          if (corner[1] > 0) {
+            ceilings[column] -= cut.depth;
+          } else {
+            floors[column] += cut.depth;
+          }
+        }
       }
     }
+  };
+  addRegion([1, 1, 1], primaryDepth, irregularity);
+  addRegion([-1, -1, -1], primaryDepth, irregularity);
+  // 高强度末段再加入浅次角；主角最深 n-1 格，任何竖直列都至少保留一格实体。
+  if (irregularity >= 0.85) {
+    const progress = Math.min(1, (irregularity - 0.85) / 0.15);
+    const secondaryDepth = Math.min(
+      primaryDepth - 1,
+      1 + Math.floor(progress * 2 + 1e-9),
+    );
+    addRegion([-1, 1, 1], secondaryDepth, progress);
+    addRegion([1, -1, -1], secondaryDepth, progress);
   }
-  for (const cut of lowerCuts) {
-    for (let z = 0; z < cut.length; z += 1) {
-      for (let x = 0; x < cut.width; x += 1) {
-        floors[x + n * z] += cut.depth;
-      }
-    }
-  }
-  return { floors, ceilings };
+  return result;
 }
 
-// Sample each corner independently; shallow, small boards may naturally produce matching single steps.
-function createCornerCuts(n, irregularity, shape, random, capacity) {
-  const depth = Math.max(
-    1,
-    Math.round(irregularity * (n - 1) * (0.8 + random() * 0.2)),
-  );
+// 深度只由强度决定；种子独立改变各角的脚印和台阶，避免 100% 随机达不到最大深度。
+function createCornerCuts(
+  depth,
+  irregularity,
+  shape,
+  random,
+  widthCapacity,
+  lengthCapacity,
+) {
+  const capacity = Math.min(widthCapacity, lengthCapacity);
   const levels =
     shape === "stepped"
       ? Math.min(depth, capacity, random() < 0.6 ? 1 : 2)
-      : Math.min(depth, capacity, Math.max(2, Math.ceil(n / 2)));
-  const footprintSize = () =>
+      : Math.min(depth, capacity);
+  const footprintSize = (capacity) =>
     Math.min(
       capacity,
       Math.max(
@@ -211,8 +228,8 @@ function createCornerCuts(n, irregularity, shape, random, capacity) {
         ),
       ),
     );
-  const width = footprintSize();
-  const length = footprintSize();
+  const width = footprintSize(widthCapacity);
+  const length = footprintSize(lengthCapacity);
   const cuts = [];
   for (let level = 0; level < levels; level += 1) {
     cuts.push({

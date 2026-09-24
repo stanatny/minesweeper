@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
 import { orbitToDirection } from "./orbit_helpers.js";
+import { assertDefaultSurface } from "./board_mode_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const ARTIFACT_DIR = resolve("artifacts");
@@ -86,7 +87,7 @@ async function openSurface(page) {
   await page.waitForFunction(
     () => window.__surveyTest?.getScene()?.cosmos?.meteors,
   );
-  await switchMode(page, "surface");
+  await assertDefaultSurface(page);
 }
 
 async function aimCell(page, id) {

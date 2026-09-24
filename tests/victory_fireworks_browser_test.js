@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import { selectPlanarBoard } from "./board_mode_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const ARTIFACT_DIR = resolve("artifacts");
@@ -60,6 +61,7 @@ function watchErrors(page, label) {
 async function openGame(page) {
   page.setDefaultTimeout(15000);
   await page.goto(`${BASE_URL}/?test=1`, { waitUntil: "networkidle" });
+  await selectPlanarBoard(page);
   await page.waitForFunction(() => {
     const test = window.__surveyTest;
     const fireworks = test?.getScene()?.fireworks;

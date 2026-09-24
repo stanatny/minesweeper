@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import { selectPlanarBoard } from "./board_mode_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const ARTIFACT_DIR = resolve("artifacts");
@@ -98,6 +99,15 @@ async function openGame(page) {
       window.__surveyTest.getScene()?.renderer &&
       window.__surveyTest.getScene()?.presentation?.cells.length,
   );
+  // 模式切换本身是用户手势；先验证初始静音门，再真实选择平面。
+  assert.equal(
+    await page.evaluate(
+      () => window.__surveyTest.getAudio().context?.state ?? null,
+    ),
+    null,
+    "Audio must wait for a user gesture on the real default field",
+  );
+  await selectPlanarBoard(page);
   await page.locator("#scene-stage canvas").waitFor({ state: "visible" });
 }
 
@@ -179,11 +189,6 @@ try {
   watchErrors(page, "polish-desktop");
   await openGame(page);
   let state = await snapshot(page);
-  assert.equal(
-    state.audio.contextState,
-    null,
-    "Audio must wait for a user gesture",
-  );
   assert.equal(state.audio.enabled, true);
   assert.equal(state.audio.musicEnabled, true);
   assert.equal(
@@ -215,7 +220,7 @@ try {
     fullPage: true,
   });
   passed(
-    "first pointer reveal clears its cursor after departure and unlocks music",
+    "first planar reveal clears its cursor after departure and user input unlocks music",
   );
 
   // Focus the container only to enter keyboard navigation; change the selection using real arrow-key input.

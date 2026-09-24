@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
 import { orbitToDirection } from "./orbit_helpers.js";
+import { assertDefaultSurface } from "./board_mode_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const ARTIFACT_DIR = resolve("artifacts");
@@ -70,9 +71,8 @@ async function openGame(page) {
   await page.goto(`${BASE_URL}/?test=1`, { waitUntil: "networkidle" });
   await page.waitForFunction(() => window.__surveyTest?.getScene()?.renderer);
   await page.locator("#board-mode").waitFor({ state: "attached" });
+  await assertDefaultSurface(page);
   await showSettings(page);
-  assert.equal(await page.locator("#board-mode").inputValue(), "plane");
-  assert.equal((await state(page)).kind, "plane");
 }
 
 async function showSettings(page) {
@@ -121,7 +121,8 @@ async function switchMode(page, kind, accept = true) {
 }
 
 async function setRange(page, selector, value) {
-  await showSurfaceGenerator(page);
+  if (!(await page.locator(selector).isVisible()))
+    await showSurfaceGenerator(page);
   const input = page.locator(selector);
   const range = await input.evaluate((element) => ({
     min: Number(element.min),
@@ -146,7 +147,8 @@ async function setRange(page, selector, value) {
 
 async function generate(page, accept = true) {
   const before = await state(page);
-  await showSurfaceGenerator(page);
+  if (!(await page.locator("#surface-generate").isVisible()))
+    await showSurfaceGenerator(page);
   await page.locator("#surface-generate").click();
   if (before.status === "playing") {
     await page.locator("#confirm-dialog").waitFor({ state: "visible" });
@@ -282,36 +284,134 @@ function isConcave(game, id) {
   });
 }
 
-async function verifyOppositeCutCorners(page) {
-  await page.locator("#reset-camera").click();
-  await frames(page, 8);
+// 从真实单位格几何识别缺角和最深底面，不依赖额外的产品测试字段。
+function cutCorners(game, expectedDepths) {
+  const { cells, resolution } = game.topology;
+  const half = resolution / 2;
+  const vertices = new Set(
+    cells.flatMap((cell) => cell.corners.map((point) => point.join(","))),
+  );
+  const cuts = [];
+  for (const x of [-1, 1])
+    for (const y of [-1, 1])
+      for (const z of [-1, 1]) {
+        if (vertices.has([x * half, y * half, z * half].join(","))) continue;
+        const floor = cells.find(
+          (cell) =>
+            cell.normal[1] === y &&
+            cell.center[0] === x * (half - 0.5) &&
+            cell.center[2] === z * (half - 0.5),
+        );
+        assert.ok(
+          floor,
+          "Every cut corner must retain an outward-facing bottom tile",
+        );
+        const corner = [x, y, z];
+        const recessed = cells.filter((cell) => {
+          const axis = cell.normal.findIndex((value) => value !== 0);
+          return (
+            Math.abs(cell.center[axis]) < half - 1e-8 &&
+            dot(cell.normal, corner) > 0 &&
+            cell.center[0] * x >= 0 &&
+            cell.center[2] * z >= 0
+          );
+        });
+        assert.equal(
+          new Set(recessed.map((cell) => cell.normal.join(","))).size,
+          3,
+          "Every cut corner must expose three perpendicular inset face directions",
+        );
+        cuts.push({
+          corner,
+          depth: half - y * floor.center[1],
+          floorId: floor.id,
+          cellIds: recessed.map((cell) => cell.id),
+        });
+      }
+  assert.deepEqual(
+    cuts.map((cut) => cut.depth).sort((a, b) => a - b),
+    expectedDepths,
+    "The actual cut count and depths must match the selected recess strength",
+  );
+  return cuts;
+}
+
+async function clickInCurrentView(page, id, touch = false) {
+  const before = await state(page);
+  let point = await page.evaluate(
+    (cellId) => window.__surveyTest.getScene().projectCell(cellId),
+    id,
+  );
+  assert.equal(
+    point.visible,
+    true,
+    `Cut tile ${id} must be pickable after real orbit input`,
+  );
+  // 此处绝不调用 focus()，避免自动转向掩盖手势未到达目标凹面的失败。
+  if (before.cells[id].mine) {
+    if (touch) {
+      await page.locator("#flag-mode").tap();
+      await page.locator("#scene-stage canvas").scrollIntoViewIfNeeded();
+      point = await page.evaluate(
+        (cellId) => window.__surveyTest.getScene().projectCell(cellId),
+        id,
+      );
+      assert.equal(point.visible, true);
+    }
+    for (const flagged of [true, false]) {
+      if (touch) await page.touchscreen.tap(point.x, point.y);
+      else await page.mouse.click(point.x, point.y, { button: "right" });
+      await frames(page);
+      assert.equal((await state(page)).cells[id].flagged, flagged);
+    }
+    if (touch) await page.locator("#reveal-mode").tap();
+  } else {
+    if (touch) await page.touchscreen.tap(point.x, point.y);
+    else {
+      await page.mouse.move(point.x, point.y);
+      await frames(page);
+      assert.equal(
+        await page.evaluate(() => window.__surveyTest.getScene().activeCellId),
+        id,
+      );
+      await page.mouse.click(point.x, point.y);
+    }
+    await frames(page);
+    assert.equal((await state(page)).cells[id].revealed, true);
+  }
+  assert.notEqual((await state(page)).status, "lost");
+  return {
+    clickedId: id,
+    marked: before.cells[id].mine,
+    newlyRevealed: !before.cells[id].mine && !before.cells[id].revealed,
+  };
+}
+
+async function verifyCutCorners(
+  page,
+  {
+    expectedDepths,
+    touchSession = null,
+    prefix = "surface_cut",
+    deepestOnly = false,
+  } = {},
+) {
   let game = await state(page);
-  const { cells, resolution, viewDirection } = game.topology;
-  const recessed = cells.filter((cell) => {
-    const axis = cell.normal.findIndex((value) => value !== 0);
-    return Math.abs(cell.center[axis]) < resolution / 2 - 1e-8;
-  });
+  const cuts = cutCorners(game, expectedDepths);
   const evidence = [];
-  for (const sign of [1, -1]) {
-    const corner = recessed.filter(
-      (cell) => sign * dot(cell.normal, viewDirection) > 0,
-    );
-    assert.equal(
-      new Set(corner.map((cell) => cell.normal.join(","))).size,
-      3,
-      "Each opposite cut must expose three perpendicular recessed face directions",
-    );
-    const target = viewDirection.map((value) => value * sign);
+  for (const [index, cut] of cuts.entries()) {
+    if (deepestOnly && cut.depth !== Math.max(...expectedDepths)) continue;
+    const target = deepestOnly ? [0, cut.corner[1], 0] : cut.corner;
     const beforeOrbit = await state(page);
-    const gesture = await orbitToDirection(page, target);
+    const gesture = await orbitToDirection(page, target, {
+      minDot: 0.99999,
+      touchSession,
+    });
     await frames(page);
     assert.deepEqual(
       await state(page),
       beforeOrbit,
-      "Dragging between opposite cut corners must not change the round",
-    );
-    const candidates = corner.filter(
-      (cell) => !game.cells[cell.id].mine && isConcave(game, cell.id),
+      "Orbiting between recessed faces must not reveal or mark any tile",
     );
     const visible = await page.evaluate(
       (ids) =>
@@ -321,37 +421,31 @@ async function verifyOppositeCutCorners(page) {
             ...window.__surveyTest.getScene().projectCell(id),
           }))
           .filter((point) => point.visible),
-      candidates.map((cell) => cell.id),
+      deepestOnly
+        ? [cut.floorId]
+        : cut.cellIds.filter((id) => isConcave(game, id)),
     );
     assert.ok(
       visible.length > 0,
-      "A real orbit must expose clickable concave tiles at both opposite corners",
+      "Real orbit input must expose a pickable tile inside every cut",
     );
     const selected =
-      visible.find((point) => !game.cells[point.id].revealed) || visible[0];
-    const previouslyRevealed = game.cells[selected.id].revealed;
-    // Click directly in the dragged view: focus() must not silently turn this corner into view.
-    await page.mouse.move(selected.x, selected.y);
-    await frames(page);
-    assert.equal(
-      await page.evaluate(() => window.__surveyTest.getScene().activeCellId),
+      visible.find(
+        (point) => !game.cells[point.id].mine && !game.cells[point.id].revealed,
+      ) || visible[0];
+    const clicked = await clickInCurrentView(
+      page,
       selected.id,
+      Boolean(touchSession),
     );
-    await page.mouse.click(selected.x, selected.y);
-    await frames(page);
     game = await state(page);
-    assert.equal(game.cells[selected.id].revealed, true);
-    const screenshot =
-      sign === 1
-        ? "surface_first_cut_corner.png"
-        : "surface_opposite_cut_corner.png";
+    const screenshot = `${prefix}_${index + 1}.png`;
     await capture(page, screenshot);
     evidence.push({
-      corner: sign === 1 ? "initial" : "opposite",
-      recessedTiles: corner.length,
+      corner: cut.corner,
+      depth: cut.depth,
       visibleConcaveTiles: visible.length,
-      clickedId: selected.id,
-      newlyRevealed: !previouslyRevealed,
+      ...clicked,
       dragPixels: [gesture.dx, gesture.dy],
       screenshot,
     });
@@ -507,7 +601,6 @@ try {
   const page = await desktopContext.newPage();
   watchErrors(page, "surface-desktop");
   await openGame(page);
-  await switchMode(page, "surface");
   let game = await state(page);
   assert.equal(game.cells.length, 216);
   assert.equal(game.topology.resolution, 6);
@@ -516,7 +609,7 @@ try {
   assert.equal(await page.locator("#plane-settings").isVisible(), false);
   assert.equal(
     Number(await page.locator("#surface-irregularity").inputValue()),
-    45,
+    75,
   );
   const leakedKeys = await page.evaluate(() => {
     const geometry = JSON.stringify(
@@ -534,6 +627,7 @@ try {
     "Presentation topology must contain geometry without hidden answers",
   );
   const defaultMetrics = validateTiles(game);
+  const defaultCuts = cutCorners(game, [4, 4]);
   const rendered = await page.evaluate(() => {
     const scene = window.__surveyTest.getScene();
     const scales = scene.cellFrames.map((frame) => frame.scale);
@@ -547,7 +641,7 @@ try {
   const firstId = await revealFirst(page);
   passed(
     "default solid has 216 equal square tiles and a safe real first reveal",
-    { ...defaultMetrics, ...rendered },
+    { ...defaultMetrics, ...rendered, cuts: defaultCuts },
   );
 
   game = await state(page);
@@ -656,11 +750,33 @@ try {
     );
   }
   await verifyFixedNumber(page, game, seamId);
-  const oppositeCorners = await verifyOppositeCutCorners(page);
+  const oppositeCorners = await verifyCutCorners(page, {
+    expectedDepths: [4, 4],
+  });
   await capture(page, "surface_desktop.png");
   passed(
     "both opposite cut corners, back-face input, fixed face numbers, and cross-seam highlights work",
     { oppositeCorners },
+  );
+
+  await setRange(page, "#surface-irregularity", 100);
+  await generate(page);
+  game = await state(page);
+  assert.equal(game.topology.irregularity, 1);
+  validateTiles(game);
+  await revealFirst(page);
+  const maximumCuts = await verifyCutCorners(page, {
+    expectedDepths: [3, 3, 5, 5],
+    prefix: "surface_max_cut",
+  });
+  const deepestFloors = await verifyCutCorners(page, {
+    expectedDepths: [3, 3, 5, 5],
+    prefix: "surface_max_floor",
+    deepestOnly: true,
+  });
+  passed(
+    "100% recess exposes four distinct cuts and both five-tile-deep floors through real orbit input",
+    { maximumCuts, deepestFloors },
   );
 
   const beforeDraft = await state(page);
@@ -945,7 +1061,6 @@ try {
   const mobile = await mobileContext.newPage();
   watchErrors(mobile, "surface-mobile-390");
   await openGame(mobile);
-  await switchMode(mobile, "surface");
   assert.equal(
     await mobile
       .locator("#surface-generator")
@@ -953,6 +1068,37 @@ try {
     false,
     "The mobile generator must initially leave room for the board",
   );
+  assert.equal(
+    await mobile.locator("#surface-irregularity").isVisible(),
+    true,
+    "Mobile recess strength must be reachable without expanding advanced settings",
+  );
+  assert.equal(
+    await mobile.locator("#surface-generate").isVisible(),
+    true,
+    "Mobile Generate must be reachable without expanding advanced settings",
+  );
+  await setRange(mobile, "#surface-irregularity", 100);
+  assert.equal(
+    await mobile
+      .locator("#surface-generator")
+      .evaluate((element) => element.open),
+    false,
+  );
+  await generate(mobile);
+  await revealFirst(mobile, true);
+  const touchSession = await mobileContext.newCDPSession(mobile);
+  let mobileDeepest;
+  try {
+    mobileDeepest = await verifyCutCorners(mobile, {
+      expectedDepths: [3, 3, 5, 5],
+      touchSession,
+      deepestOnly: true,
+      prefix: "surface_mobile_max_floor",
+    });
+  } finally {
+    await touchSession.detach();
+  }
   await setRange(mobile, "#surface-area", 4);
   await selectShape(mobile, "terrace");
   await generate(mobile);
@@ -997,7 +1143,8 @@ try {
     "Returning to plane mode must preserve classic touch gameplay",
   );
   passed(
-    "390px surface settings, touch reveal and marking, and returning to plane mode work",
+    "390px controls, touch orbit to maximum-depth recesses, touch marking, and returning to plane mode work",
+    { mobileDeepest },
   );
   await mobileContext.close();
 

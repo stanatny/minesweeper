@@ -34,6 +34,30 @@ function verticalColumns(topology) {
   });
 }
 
+// 从真实顶点与顶底面读出八角缺口，不依赖生成器的内部高度场或新增元数据。
+function cornerDepths(topology) {
+  const n = topology.resolution;
+  const vertices = new Set(
+    topology.cells.flatMap((cell) => cell.corners.map(pointKey)),
+  );
+  const columns = verticalColumns(topology);
+  const corners = [];
+  for (const x of [-1, 1]) {
+    for (const y of [-1, 1]) {
+      for (const z of [-1, 1]) {
+        const column = columns[(x > 0 ? n - 1 : 0) + n * (z > 0 ? n - 1 : 0)];
+        const depth = y > 0 ? n - column.ceiling : column.floor;
+        assert.equal(
+          vertices.has(pointKey([x, y, z].map((sign) => (sign * n) / 2))),
+          depth === 0,
+        );
+        corners.push({ direction: [x, y, z], depth });
+      }
+    }
+  }
+  return corners;
+}
+
 function triangles(cell) {
   const result = [];
   for (let row = 0; row < cell.patchSize - 1; row += 1) {
@@ -131,7 +155,7 @@ test("every resolution and shape preserves six complete direction atlases and ex
             assert.equal(cell.y, cell.face * resolution + cell.v);
             assert.equal(cell.x, cell.id % resolution);
             assert.equal(cell.y, Math.floor(cell.id / resolution));
-            assert(cell.neighbors.length >= 6 && cell.neighbors.length <= 9);
+            assert(cell.neighbors.length >= 6 && cell.neighbors.length <= 10);
             assert.equal(new Set(cell.neighbors).size, cell.neighbors.length);
             assert(!cell.neighbors.includes(cell.id));
             for (const neighbor of cell.neighbors)
@@ -228,12 +252,15 @@ test("all tiles are coplanar unit squares with outward axis-aligned normals and 
 });
 
 test("integer corner adjacency matches real contact and the closed mesh has one manifold link at every vertex", () => {
-  for (const resolution of [4, 6, 12]) {
+  for (let resolution = 4; resolution <= 12; resolution += 1) {
     for (const shape of ["cube", "stepped", "terrace"]) {
       for (const [seed, irregularity] of [
         [1, 0.05],
         [42, 0.45],
         [912, 0.75],
+        [42, 0.85],
+        [14864, 0.9],
+        [912, 0.95],
         [1, 1],
         [42, 1],
         [912, 1],
@@ -340,10 +367,12 @@ test("regular cubes have the usual corner graph and zero irregularity removes ev
   }
 });
 
-test("opposite corner cuts remain separate, retain solid center walls, and leave every axis ray connected", () => {
+test("corner cuts retain solid center walls and leave every axis ray connected", () => {
   for (let resolution = 4; resolution <= 12; resolution += 1) {
     for (const shape of ["stepped", "terrace"]) {
-      for (const irregularity of [0.001, 0.05, 0.45, 1]) {
+      for (const irregularity of [
+        0.001, 0.05, 0.45, 0.75, 0.85, 0.9, 0.95, 1,
+      ]) {
         for (const seed of [1, 42, 14864]) {
           const topology = createSurface({
             resolution,
@@ -365,15 +394,14 @@ test("opposite corner cuts remain separate, retain solid center walls, and leave
                 column.ceiling <= resolution,
             ),
           );
+          let separatingWalls = 0;
           for (const axis of ["x", "z"]) {
             const upperMin = Math.min(...upper.map((column) => column[axis]));
             const upperMax = Math.max(...upper.map((column) => column[axis]));
             const lowerMin = Math.min(...lower.map((column) => column[axis]));
             const lowerMax = Math.max(...lower.map((column) => column[axis]));
-            assert(
-              upperMin - lowerMax >= 2 || lowerMin - upperMax >= 2,
-              "At least one full voxel wall must separate opposite cuts",
-            );
+            if (upperMin - lowerMax >= 2 || lowerMin - upperMax >= 2)
+              separatingWalls += 1;
             assert(
               Array.from({ length: resolution }, (_, index) =>
                 columns.filter((column) => column[axis] === index),
@@ -385,6 +413,10 @@ test("opposite corner cuts remain separate, retain solid center walls, and leave
               ),
             );
           }
+          assert(
+            separatingWalls >= 1,
+            "Upper and lower cuts must stay on opposite sides of a full voxel wall",
+          );
           const occupied = (x, y, z) => {
             const column = columns[x + z * resolution];
             return y >= column.floor && y < column.ceiling;
@@ -427,7 +459,7 @@ test("default-sized corner cuts are both visible in geometry and vary independen
     for (let seed = 14864; seed < 14884; seed += 1) {
       const topology = createSurface({
         resolution: 6,
-        irregularity: 0.45,
+        irregularity: 0.75,
         shape,
         seed,
       });
@@ -506,6 +538,118 @@ test("seed and relief change the block layout deterministically while keeping ex
   const larger = createSurface({ resolution: 12, shape: "cube" });
   assert.equal(larger.surfaceArea / smaller.surfaceArea, 9);
   assert(Math.abs(larger.radius / smaller.radius - 3) < 1e-12);
+});
+
+test("default relief deepens the two primary corners and maximum relief adds two shallower corners", () => {
+  assert.equal(createSurface().irregularity, 0.75);
+  for (let resolution = 4; resolution <= 12; resolution += 1) {
+    for (const shape of ["stepped", "terrace"]) {
+      for (const seed of [1, 42, 912, 14864, 14865]) {
+        let previousPrimaryDepth = 0;
+        for (const irregularity of [
+          0, 0.05, 0.45, 0.75, 0.849999, 0.85, 0.9, 0.95, 1,
+        ]) {
+          const topology = createSurface({
+            resolution,
+            shape,
+            irregularity,
+            seed,
+          });
+          const corners = cornerDepths(topology);
+          const cut = corners.filter((corner) => corner.depth > 0);
+          if (irregularity === 0) {
+            assert.equal(cut.length, 0);
+            continue;
+          }
+          assert.equal(cut.length, irregularity < 0.85 ? 2 : 4);
+          const primary = corners.find((corner) =>
+            corner.direction.every(
+              (sign, axis) => sign * topology.viewDirection[axis] > 0,
+            ),
+          );
+          const opposite = corners.find((corner) =>
+            corner.direction.every(
+              (sign, axis) => sign === -primary.direction[axis],
+            ),
+          );
+          const expectedDepth = Math.max(
+            1,
+            Math.round(irregularity * (resolution - 1)),
+          );
+          assert.equal(primary.depth, expectedDepth);
+          assert.equal(opposite.depth, expectedDepth);
+          assert(primary.depth >= previousPrimaryDepth);
+          previousPrimaryDepth = primary.depth;
+          assert.equal(
+            cut.filter((corner) => corner.direction[1] > 0).length,
+            cut.length / 2,
+          );
+          const secondary = cut.filter(
+            (corner) => corner !== primary && corner !== opposite,
+          );
+          if (secondary.length) {
+            const expectedSecondary = Math.min(
+              expectedDepth - 1,
+              irregularity < 0.925 ? 1 : irregularity < 1 ? 2 : 3,
+            );
+            for (const corner of secondary) {
+              assert.equal(corner.depth, expectedSecondary);
+              assert(corner.depth < primary.depth);
+            }
+          }
+          if (irregularity === 1) assert.equal(primary.depth, resolution - 1);
+          if (resolution === 6 && irregularity === 0.75)
+            assert.deepEqual(
+              cut.map((corner) => corner.depth),
+              [4, 4],
+            );
+        }
+      }
+    }
+  }
+});
+
+test("first clicks on additional corner seams reserve the actual ten-neighbor safe area", () => {
+  const topology = createSurface({
+    resolution: 4,
+    shape: "stepped",
+    irregularity: 0.85,
+    seed: 1,
+  });
+  assert.equal(topology.maxDegree, 10);
+  const firstIds = new Set(
+    topology.cells
+      .filter((cell) => cell.neighbors.length === 10)
+      .map((cell) => cell.id),
+  );
+  for (const corner of cornerDepths(topology).filter(
+    (corner) => corner.depth > 0,
+  )) {
+    const cell = topology.cells.find(
+      (cell) =>
+        cell.normal[1] === corner.direction[1] &&
+        [0, 2].every(
+          (axis) =>
+            cell.center[axis] ===
+            (corner.direction[axis] * (topology.resolution - 1)) / 2,
+        ),
+    );
+    assert(cell);
+    firstIds.add(cell.id);
+  }
+  for (const id of firstIds) {
+    const field = new Minefield({
+      topology,
+      mines: topology.cellCount - topology.maxDegree - 1,
+      random: randomSource(id + 1),
+    });
+    field.reveal(id);
+    assert.equal(field.cells[id].adjacent, 0);
+    assert(field.cells[id].revealed);
+    assert.equal(field.cells.filter((cell) => cell.mine).length, 85);
+    for (const safeId of [id, ...field.neighbors(id)])
+      assert.equal(field.cells[safeId].mine, false);
+  }
 });
 
 test("surface geometry is recursively frozen and does not contain answer fields", () => {

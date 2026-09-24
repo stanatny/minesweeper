@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="css/style.css" />
     <script defer src="dist/explorer.js"></script>
   </head>
-  <body>
+  <body data-board-mode="surface">
     <div id="app" class="expedition">
       <header class="masthead">
         <a class="brand" href="./" aria-label="VOID SURVEY home"
@@ -179,9 +179,9 @@
               <span class="tiny-cross" aria-hidden="true">+</span> THE
               EXPEDITION
             </p>
-            <h1>Chart the <span>unknown.</span></h1>
+            <h1>Beyond the flat.<span>Into the corners.</span></h1>
             <p class="mission-description">
-              A dormant relic.<br />Every number points to safety.
+              Read the edges.<br />Find the safe path around every corner.
             </p>
           </div>
           <section
@@ -195,8 +195,8 @@
               >
               <div class="select-wrap">
                 <select id="board-mode">
+                  <option value="surface" selected>Carved cube</option>
                   <option value="plane">Planar ruin</option>
-                  <option value="surface">Faceted solid</option>
                 </select>
                 <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path
@@ -207,7 +207,7 @@
                 </svg>
               </div>
             </div>
-            <div id="plane-settings">
+            <div id="plane-settings" hidden>
               <label class="field-label" for="preset-select"
                 >Survey area<span>SECTOR</span></label
               >
@@ -261,22 +261,43 @@
                 aria-live="polite"
               ></p>
             </div>
-            <div id="surface-settings" hidden>
-              <details id="surface-generator" open>
+            <div id="surface-settings">
+              <div class="surface-range surface-primary-range">
+                <label for="surface-irregularity"
+                  >Recess depth<output
+                    id="surface-irregularity-value"
+                    for="surface-irregularity"
+                    >75%</output
+                  ></label
+                >
+                <input
+                  id="surface-irregularity"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value="75"
+                  aria-describedby="surface-relief-hint"
+                />
+                <p id="surface-relief-hint">
+                  Deeper steps. Equal square tiles.
+                </p>
+              </div>
+              <details id="surface-generator">
                 <summary>
-                  Shape generator<span id="surface-summary"
-                    >216 equal tiles · 45% cuts</span
+                  More settings<span id="surface-summary"
+                    >216 tiles · 30 cores</span
                   >
                 </summary>
                 <div class="surface-generator-fields">
                   <label class="field-label" for="surface-shape"
-                    >Form<span>ORIGIN</span></label
+                    >Cut style<span>FORM</span></label
                   >
                   <div class="select-wrap">
                     <select id="surface-shape">
-                      <option value="stepped">Opposite cuts · stepped</option>
-                      <option value="terrace">Terraces · layered</option>
-                      <option value="cube">Cube · regular</option>
+                      <option value="stepped">Stepped cuts</option>
+                      <option value="terrace">Terraces</option>
+                      <option value="cube">Regular cube</option>
                     </select>
                     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
                       <path
@@ -288,7 +309,7 @@
                   </div>
                   <div class="surface-range">
                     <label for="surface-area"
-                      >Surface area<output
+                      >Tile count<output
                         id="surface-area-value"
                         for="surface-area"
                         >216 tiles</output
@@ -308,27 +329,6 @@
                     </p>
                   </div>
                   <div class="surface-range">
-                    <label for="surface-irregularity"
-                      >Corner cuts<output
-                        id="surface-irregularity-value"
-                        for="surface-irregularity"
-                        >45%</output
-                      ></label
-                    >
-                    <input
-                      id="surface-irregularity"
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="5"
-                      value="45"
-                      aria-describedby="surface-relief-hint"
-                    />
-                    <p id="surface-relief-hint">
-                      Opposite corners. Equal square tiles.
-                    </p>
-                  </div>
-                  <div class="surface-range">
                     <label for="surface-density"
                       >Core density<output
                         id="surface-density-value"
@@ -345,24 +345,22 @@
                       value="14"
                     />
                   </div>
-                  <button
-                    id="surface-generate"
-                    class="text-button"
-                    type="button"
-                  >
-                    Generate new solid<span aria-hidden="true">↗</span>
-                  </button>
-                  <p id="surface-draft-note" class="generator-note">
-                    Sharp edges. Equal squares on every face.
-                  </p>
-                  <p
-                    id="surface-error"
-                    class="field-error"
-                    role="alert"
-                    aria-live="polite"
-                  ></p>
                 </div>
               </details>
+              <div class="surface-actions">
+                <button id="surface-generate" class="text-button" type="button">
+                  Generate cube<span aria-hidden="true">↗</span>
+                </button>
+                <p id="surface-draft-note" class="generator-note">
+                  Generate to apply.
+                </p>
+              </div>
+              <p
+                id="surface-error"
+                class="field-error"
+                role="alert"
+                aria-live="polite"
+              ></p>
               <p id="surface-current" class="surface-current"></p>
             </div>
           </section>
@@ -410,17 +408,18 @@
             <span class="footnote-line"></span>Find the pattern in the unknown.
           </div>
         </aside>
-        <section class="scene-section" aria-label="3D relic field">
-          <div class="scene-topline" aria-hidden="true">
-            <span><span class="tiny-cross">+</span> RELIC FIELD</span
-            ><span class="scene-projection"
-              >SPATIAL SCANNER<span class="projection-mark"></span
-            ></span>
+        <section class="scene-section" aria-label="3D minefield">
+          <div class="scene-topline">
+            <span class="field-name"
+              ><span class="tiny-cross" aria-hidden="true">+</span>
+              <span id="field-title">Carved cube</span></span
+            >
+            <span id="field-hint">Drag to explore every side</span>
           </div>
           <div class="scene-viewport">
             <div
               id="scene-stage"
-              aria-label="3D minesweeper board. Drag to orbit, scroll to zoom, or explore with the keyboard."
+              aria-label="Carved cube minesweeper. Drag to explore every side, scroll to zoom, or explore with the keyboard."
             ></div>
             <div
               id="fallback-board"
@@ -579,12 +578,14 @@
       </p>
       <dl class="guide-list">
         <div>
-          <dt>Faceted solids</dt>
+          <dt>Carved cube</dt>
           <dd>
-            Choose Faceted solid to explore a whole stepped 3D object. Every
-            tile is an equal-sized square, and numbers sit flat on its face.
-            Surface area controls the tile count; opposite-corner cuts change
-            the silhouette without changing the area. Tiles sharing an edge or
+            The default Carved cube opens with 216 tiles, 30 cores, and 75%
+            recess depth. Every tile is an equal-sized square, and numbers sit
+            flat on its face. Adjust Recess depth to change the stepped
+            silhouette. More settings contains Cut style, Tile count, and Core
+            density. Generate cube applies your choices. At 85% depth, two
+            additional corner recesses begin to open. Tiles sharing an edge or
             corner are neighbors, including across ridges and inside corners.
             Hover or focus a tile to see its full neighborhood. Rotate to reach
             the back; every side counts toward completion.

@@ -478,6 +478,18 @@ select option {
 .scene-topline .tiny-cross {
   margin-right: 2px;
 }
+/* 场景名称和拖拽提示独立于设置区，手机收起设置后仍能识别当前玩法。 */
+#field-title {
+  color: var(--muted);
+  letter-spacing: 0.8px;
+  white-space: nowrap;
+}
+#field-hint {
+  font-family: var(--font-body);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-align: right;
+}
 .scene-projection {
   font-family: var(--font-body);
   font-size: 10px;
@@ -1586,11 +1598,35 @@ kbd {
   display: flex;
   justify-content: space-between;
 }
+/* 深度与生成入口常驻；其他参数折叠后不改变这两个主控件的位置关系。 */
+.surface-primary-range {
+  margin-top: 0;
+}
+.surface-primary-range label {
+  color: var(--ink);
+  font-size: 12px;
+}
+.surface-primary-range output {
+  font-size: 14px;
+}
+.surface-primary-range input {
+  min-height: 32px;
+}
+.surface-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 10px;
+}
 #surface-generate {
-  margin-top: 12px;
+  min-height: 36px;
+  margin-top: 0;
+  flex-shrink: 0;
 }
 .generator-note {
-  margin-top: 5px;
+  flex: 1 1 100px;
+  margin: 0;
 }
 .surface-current {
   margin-top: 11px;
@@ -1634,7 +1670,7 @@ body[data-board-mode="surface"] .region-settings {
     grid-column: 1 / -1;
   }
   #surface-generator {
-    margin-top: 0;
+    margin-top: 10px;
   }
   #surface-generator > summary {
     padding: 10px 0;
@@ -1649,18 +1685,24 @@ body[data-board-mode="surface"] .region-settings {
     column-gap: 20px;
   }
   .surface-generator-fields > .field-label,
-  .surface-generator-fields > .select-wrap,
-  #surface-generate,
-  .generator-note,
-  #surface-error {
+  .surface-generator-fields > .select-wrap {
     grid-column: 1 / -1;
   }
   .surface-range {
     min-width: 0;
     margin-top: 10px;
   }
-  .surface-range:first-of-type {
-    grid-column: 1 / -1;
+  .surface-primary-range {
+    margin-top: 0;
+  }
+  .surface-actions {
+    margin-top: 4px;
+  }
+  #field-hint {
+    font-size: 9px;
+  }
+  .scene-topline {
+    gap: 10px;
   }
   .surface-range label {
     flex-wrap: wrap;
@@ -1694,6 +1736,60 @@ body[data-board-mode="surface"] .region-settings {
   }
   body[data-board-mode="surface"] .mode-field {
     grid-column: 1 / -1;
+  }
+}
+
+/* 手机立体模式压缩辅助区，保留深度、生成按钮、核心计数与原棋盘尺寸。 */
+@media (max-width: 760px) {
+  body[data-board-mode="surface"] .mission-rail {
+    row-gap: 6px;
+    padding-top: 10px;
+  }
+  body[data-board-mode="surface"] .region-settings {
+    row-gap: 6px;
+  }
+  body[data-board-mode="surface"] .mode-field {
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 10px;
+  }
+  body[data-board-mode="surface"] .mode-field .select-wrap {
+    margin-top: 0;
+  }
+  body[data-board-mode="surface"] .surface-primary-range input {
+    margin-top: 0;
+  }
+  body[data-board-mode="surface"] .surface-primary-range p {
+    font-size: 9px;
+    line-height: 1.4;
+  }
+  body[data-board-mode="surface"] #surface-generator {
+    margin-top: 6px;
+  }
+  body[data-board-mode="surface"] .surface-actions {
+    display: grid;
+    grid-template-columns: minmax(115px, 0.9fr) minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 0;
+    border-top: 1px solid var(--line);
+  }
+  body[data-board-mode="surface"] #surface-generate {
+    width: auto;
+    border-top: 0;
+  }
+  body[data-board-mode="surface"] .generator-note {
+    font-size: 9px;
+    line-height: 1.4;
+    text-align: right;
+  }
+  body[data-board-mode="surface"] .surface-current {
+    margin-top: 1px;
+    font-size: 8.5px;
+    line-height: 1.4;
+  }
+  body[data-board-mode="surface"][data-game-state="ready"] #status-description {
+    display: none;
   }
 }
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import { verifyInputCancellation } from "./input_cancel_checks.js";
+import { assertDefaultSurface } from "./board_mode_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const checks = [];
@@ -57,19 +58,7 @@ async function open(page) {
   page.setDefaultTimeout(15000);
   await page.goto(`${BASE_URL}/?test=1`);
   await page.waitForFunction(() => window.__surveyTest?.getScene()?.renderer);
-  if (!(await page.locator("#board-mode").isVisible()))
-    await page.locator("#settings-btn").click();
-  assert.deepEqual(
-    await page
-      .locator("#board-mode option")
-      .evaluateAll((options) => options.map((option) => option.value)),
-    ["plane", "surface"],
-    "Only planar ruins and faceted solids may be selected",
-  );
-  await page.locator("#board-mode").selectOption("surface");
-  await page.waitForFunction(
-    () => document.body.dataset.boardMode === "surface",
-  );
+  await assertDefaultSurface(page);
   await settle(page);
 }
 

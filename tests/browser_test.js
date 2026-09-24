@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { access, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import { selectPlanarBoard } from "./board_mode_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const ARTIFACT_DIR = resolve("artifacts");
@@ -89,6 +90,7 @@ async function openGame(page) {
       window.__surveyTest?.getScene()?.renderer &&
       window.__surveyTest?.getGame()?.cells.length,
   );
+  await selectPlanarBoard(page);
   await page.locator("#scene-stage canvas").waitFor({ state: "visible" });
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(400);

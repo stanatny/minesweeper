@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
+import { selectPlanarBoard } from "./board_mode_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const BROWSER_ERRORS = [];
@@ -36,6 +37,7 @@ function watchErrors(page, label) {
 async function openExpertGame(page) {
   page.setDefaultTimeout(15000);
   await page.goto(`${BASE_URL}/?test=1`, { waitUntil: "networkidle" });
+  await selectPlanarBoard(page, { keepSettingsOpen: true });
   await page.waitForFunction(() => {
     const scene = window.__surveyTest?.getScene();
     return (

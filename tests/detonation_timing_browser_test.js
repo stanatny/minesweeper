@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import { selectPlanarBoard } from "./board_mode_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const ARTIFACT_DIR = resolve("artifacts");
@@ -44,6 +45,7 @@ try {
   });
   await page.goto(`${BASE_URL}/?test=1`, { waitUntil: "networkidle" });
   await page.waitForFunction(() => window.__surveyTest?.getScene()?.renderer);
+  await selectPlanarBoard(page, { keepSettingsOpen: true });
   if (!(await page.locator("#preset-select").isVisible())) {
     await page.locator("#settings-btn").click();
   }

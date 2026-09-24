@@ -1,6 +1,6 @@
 # VOID SURVEY
 
-A 3D Minesweeper expedition across a floating ruin or a stepped solid. Explore metal hatches, interpret nearby hazards, and place energy beacons. Classic Minesweeper rules extend across sharp-edged 3D forms with equally sized square tiles and numbers printed on each face.
+A 3D Minesweeper expedition across a carved cube, with a floating planar ruin available as an alternative. Explore metal hatches, interpret nearby hazards, and place energy beacons. Classic Minesweeper rules extend across sharp-edged 3D forms with equally sized square tiles and numbers printed on each face.
 
 [Changelog](changelog.md)
 
@@ -16,6 +16,8 @@ Visit <http://127.0.0.1:8765>. The 3D renderer requires WebGL 2. If WebGL is una
 
 The [GitHub Pages version](https://stanatny.github.io/minesweeper/) follows the repository's deployment configuration. Local changes do not automatically update the live site.
 
+The default **Carved cube** starts with **75% recess depth, 216 tiles, and 30 cores**. Explore the stepped corners immediately, or choose **Field type → Planar ruin** for the classic rectangular layout.
+
 ### Controls
 
 | Action           | Input                                                                                                                       |
@@ -28,27 +30,29 @@ The [GitHub Pages version](https://stanatny.github.io/minesweeper/) follows the 
 | Keyboard         | Tab into the board, use the arrow keys to select a cell, press Enter or Space to reveal, and F to flag.                     |
 | View and restart | Press V for top-down view or R to restart. Restarting an active round requires confirmation.                                |
 
-Choose Scout (beginner: 9 × 9, 10 mines), Deep (intermediate: 16 × 16, 40 mines), or Frontier (expert: 30 × 16, 99 mines). Custom boards support widths of 5–50, heights of 5–30, and 1 to width × height − 9 mines.
+In **Planar ruin**, choose Scout (beginner: 9 × 9, 10 mines), Deep (intermediate: 16 × 16, 40 mines), or Frontier (expert: 30 × 16, 99 mines). Custom boards support widths of 5–50, heights of 5–30, and 1 to width × height − 9 mines.
 
-### Faceted solid mode
+### Carved cube mode
 
-Use **Field type → Faceted solid** to play across an entire closed 3D object. Drag to rotate continuously in any direction, including complete vertical flips across both poles, and reach the back, top, underside, and recessed steps. Reset view restores the original upright orientation. Every tile is the same physical size: a unit square on a flat face. Numbers follow the orientation of their face instead of floating toward the camera.
+**Carved cube** is the default field type: play across an entire closed 3D object. Drag to rotate continuously in any direction, including complete vertical flips across both poles, and reach the back, top, underside, and recessed steps. Reset view restores the original upright orientation. Every tile is the same physical size: a unit square on a flat face. Numbers follow the orientation of their face instead of floating toward the camera.
 
-Open **Shape generator** to prepare a new field:
+**Recess depth** is the primary setting and remains visible when **More settings** is collapsed. It starts at 75% and changes the depth and arrangement of integer-sized steps without changing the total area or tile count. Shape changes occur in discrete steps. This control is disabled for **Regular cube**. With either cut style, two additional corners start opening at 85% depth. At maximum depth, the shape has four recessed corners: two deep opposite cuts and two shallower cuts.
 
-- **Opposite cuts** creates independent stepped recesses at two opposite corners, including the underside. **Terraces** adds successive setbacks at both corners. **Cube** keeps a regular cubic silhouette.
-- **Surface area** selects 96–864 playable tiles. Each tile has an area of one square unit, so this changes the actual area without stretching individual squares.
-- **Corner cuts** changes the depth and arrangement of integer-sized steps while preserving the total area and tile count. This control is disabled for the regular Cube. Increasing cuts changes the shape in discrete steps.
-- **Core density** sets the proportion of mines from 8% to 25%.
-- **Generate new solid** applies the settings with a new shape seed. Changes remain a draft until applied; replacing an active survey requires confirmation. **New survey** keeps the shape and starts a fresh mine layout.
+Open **More settings** for the remaining parameters:
+
+- **Cut style** selects **Stepped cuts**, successive **Terraces**, or an uncut **Regular cube**.
+- **Tile count** selects 96–864 playable tiles. Each tile has an area of one square unit, so this changes the actual area without stretching individual squares.
+- **Core density** sets the proportion of mines from 8% to 25%; the default is 14%, or 30 cores across 216 tiles.
+
+**Generate cube** applies the draft settings with a new shape seed. The button remains available when More settings is collapsed. Changes stay separate from the current field until applied; replacing an active survey requires confirmation. **New survey** keeps the shape and starts a fresh mine layout.
 
 Tiles sharing an edge or corner are neighbors, including across convex ridges and recessed corners. The number of neighbors can vary at those corners. Hovering or keyboard-focusing a tile highlights its actual neighborhood. Numbers, first-move protection, flood reveal, and chording all use these same connections. Shape changes can alter the adjacency graph, so they are only applied when generating a new field.
 
 Arrow keys follow adjacent tiles in the current viewing direction, and keyboard focus turns a hidden face into view. Top view is a camera preset; rotation remains available. Mines, beacons, and flame jets follow their supporting face.
 
-The generator cuts whole blocks from opposite corners of a cubic volume to create one closed orthogonal body. A solid center keeps the body connected without tunnels or touching cutouts. The cuts preserve surface area, and all exposed faces are tiled with equal squares. Shape seeds are displayed beneath the generator. If WebGL becomes unavailable, the same game continues in a six-direction atlas with the original cross-face adjacency and accessible neighbor labels. The atlas groups tiles by the direction they face, including separate terraces at different depths.
+The generator cuts whole blocks from corners of a cubic volume to create one closed orthogonal body. A solid center keeps the body connected without tunnels or touching cutouts. The cuts preserve surface area, and all exposed faces are tiled with equal squares. If WebGL becomes unavailable, the same game continues in a six-direction atlas with the original cross-face adjacency and accessible neighbor labels. The atlas groups tiles by the direction they face, including separate terraces at different depths.
 
-The generator collapses after the first reveal to make room for the survey status; reopen it to prepare another shape.
+**More settings** starts collapsed on every screen and collapses again after the first reveal. Recess depth and Generate cube stay available whenever the settings panel is open. The field name and drag hint remain visible above the board even when settings are hidden.
 
 ### Effects and audio
 
@@ -91,7 +95,7 @@ After editing `js/`, run `npm run build` and refresh the page. The browser loads
 - `index.html`, `css/style.css`: Responsive mission interface and accessible controls.
 - `js/explorer.js`: Input, timing, difficulty, game status, and compatibility mode.
 - `js/game_engine.js`: Independent Minesweeper state engine.
-- `js/surface_topology.js`: Deterministic solids with opposite-corner recesses, unit-square tiles, shared-corner adjacency, and independently controlled area and corner cuts.
+- `js/surface_topology.js`: Deterministic carved solids with unit-square tiles, shared-corner adjacency, and independently controlled tile count and recess depth.
 - `js/surface_scene.js`: Equal square plates, face-aligned numbers, full-object orbiting, occlusion-aware picking, neighbor highlighting, and face-oriented mines and flame jets.
 - `js/free_orbit_controls.js`: Continuous quaternion-based rotation for closed 3D fields, with mouse and touch input, pinch zoom, and gesture cancellation.
 - `js/survey_scene.js`: Editable, procedural 3D models for hatches, fractured rock columns, the floating reactor, orbital rings, beacons, and the camera.

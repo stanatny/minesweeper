@@ -68,16 +68,21 @@ function syncWorldControls() {
   $("surface-settings").hidden = !surface;
   const topology = model.topology;
   $("surface-current").textContent = surface
-    ? `${topology.cellCount} tiles · ${model.mines} cores · Seed ${topology.seed}`
+    ? `Current: ${Math.round(topology.irregularity * 100)}% depth · ${topology.cellCount} tiles · ${model.mines} cores`
     : "";
   $("surface-summary").textContent = surface
-    ? `${topology.cellCount} equal tiles · ${Math.round(topology.irregularity * 100)}% cuts`
-    : "216 equal tiles · 45% cuts";
+    ? `${topology.cellCount} tiles · ${model.mines} cores`
+    : "216 tiles · 30 cores";
+  $("surface-current").title = surface ? `Shape seed: ${topology.seed}` : "";
+  $("field-title").textContent = surface ? "Carved cube" : "Planar ruin";
+  $("field-hint").textContent = surface
+    ? "Drag to explore every side"
+    : "Drag to orbit · Scroll to zoom";
   document.querySelector(".mission-intro h1").innerHTML = surface
-    ? "Every face.<span>One solid puzzle.</span>"
+    ? "Beyond the flat.<span>Into the corners.</span>"
     : "Chart the <span>unknown.</span>";
   document.querySelector(".mission-description").innerHTML = surface
-    ? "Read the edges.<br />Find the safe path around every corner."
+    ? "A cube carved for discovery.<br />Follow the clues into every recess."
     : "A dormant relic.<br />Every number points to safety.";
   stage.setAttribute(
     "aria-label",
@@ -146,12 +151,21 @@ function updateSurfaceDraft() {
   $("surface-irregularity").disabled = draft.shape === "cube";
   $("surface-relief-hint").textContent =
     draft.shape === "cube"
-      ? "A regular cube has no corner cuts."
-      : "Opposite corners. Equal square tiles.";
+      ? "Choose a carved style in More settings to add recesses."
+      : draft.irregularity === 0
+        ? "No recesses. Increase depth to carve the corners."
+        : draft.irregularity >= 0.85
+          ? "Deep main cuts with extra recesses at other corners."
+          : "Deepen opposite corners. Every tile stays the same size.";
+  $("surface-irregularity").setAttribute(
+    "aria-valuetext",
+    draft.shape === "cube"
+      ? "Off for regular cube"
+      : `${Math.round(draft.irregularity * 100)} percent recess depth`,
+  );
   $("surface-density-value").textContent =
     `${draft.density}% · ${Math.floor((count * draft.density) / 100)} cores`;
-  $("surface-draft-note").textContent =
-    "Generate to apply these settings. Your current field stays unchanged.";
+  $("surface-draft-note").textContent = "Generate to apply draft.";
 }
 
 function generateSurfaceConfig() {
@@ -631,7 +645,7 @@ $("apply-btn").addEventListener("click", async () => {
   }
 });
 
-$("surface-generator").open = matchMedia("(min-width: 761px)").matches;
+$("surface-generator").open = false;
 for (const id of [
   "surface-shape",
   "surface-area",
@@ -673,8 +687,7 @@ $("surface-generate").addEventListener("click", async () => {
     $("surface-error").textContent = "";
     surfaceConfig = next;
     startGame(surfaceConfig);
-    $("surface-draft-note").textContent =
-      "New solid ready. Equal squares on every face.";
+    $("surface-draft-note").textContent = "New cube ready.";
     if (matchMedia("(max-width: 760px)").matches)
       $("surface-generator").open = false;
   } catch (error) {
@@ -753,7 +766,10 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-startGame();
+updateSurfaceDraft();
+surfaceConfig = generateSurfaceConfig();
+startGame(surfaceConfig);
+$("surface-draft-note").textContent = "Ready to explore.";
 mountScene();
 
 setInterval(() => {

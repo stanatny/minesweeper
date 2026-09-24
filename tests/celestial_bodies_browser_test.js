@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import { orbitToDirection } from "./orbit_helpers.js";
+import { assertDefaultSurface } from "./board_mode_helpers.js";
 
 const BASE_URL = process.env.SURVEY_TEST_URL || "http://127.0.0.1:8765";
 const errors = [];
@@ -104,7 +105,7 @@ try {
     if (message.type() === "error") errors.push(message.text());
   });
   await page.goto(`${BASE_URL}/?test=1`, { waitUntil: "networkidle" });
-  await page.locator("#board-mode").selectOption("surface");
+  await assertDefaultSurface(page);
   await page.waitForFunction(
     () => window.__surveyTest?.getScene()?.cosmos?.bodies?.length === 10,
   );
