@@ -9,6 +9,7 @@ import { SurveyEffects } from "./survey_effects.js";
 import { MineModels } from "./mine_model.js";
 import { DetonationSequence } from "./detonation_sequence.js";
 import { VictoryFireworks } from "./victory_fireworks.js";
+import { TouchChordGesture } from "./touch_chord.js";
 
 const PALETTE = {
   closed: new THREE.Color("#b87b51"),
@@ -18,6 +19,7 @@ const PALETTE = {
   flagged: new THREE.Color("#28434a"),
   flaggedHover: new THREE.Color("#36555b"),
   danger: new THREE.Color("#95483a"),
+  hint: new THREE.Color("#ffe0a5"),
 };
 
 // SurveyScene renders public game snapshots as an orbitable ruin and reports the cell hit by input.
@@ -86,6 +88,10 @@ export class SurveyScene {
     this.topView = false;
     this.pointerState = null;
     this.pointers = new Set();
+    this.touchGesture = new TouchChordGesture();
+    this.chordHintIds = new Set();
+    this.chordHintRemaining = 0;
+    this.hintColor = new THREE.Color();
     this.board = new THREE.Group();
     this.scene.add(this.board);
     this.labelMeshes = [];
@@ -148,6 +154,7 @@ export class SurveyScene {
 
   // Rebuild from a snapshot with hidden mines masked; release old geometry and materials before starting a new board.
   rebuild(snapshot) {
+    this.resetTransientInput();
     this.detonation.reset();
     this.fireworks.clear();
     this.callbacks.onFireworksStop?.();
@@ -318,7 +325,42 @@ export class SurveyScene {
   }
 
   setMode(mode) {
+    if (this.mode !== mode) this.touchGesture.cancel();
     this.mode = mode;
+  }
+
+  // 数量不符时仅提示仍可操作的邻格；减少动态模式保持一次静态亮起。
+  flashChordHint(ids) {
+    this.chordHintIds = new Set(ids);
+    this.chordHintRemaining = ids.length ? 0.65 : 0;
+    this.drawTiles();
+  }
+
+  clearChordHint() {
+    if (!this.chordHintIds.size) return;
+    this.chordHintIds.clear();
+    this.chordHintRemaining = 0;
+    if (this.presentation && !this.disposed) this.drawTiles();
+  }
+
+  chordHintStrength(id) {
+    if (!this.chordHintIds.has(id) || this.chordHintRemaining <= 0) return 0;
+    return this.reducedMotion.matches
+      ? 0.7
+      : 0.3 +
+          (0.5 *
+            (1 +
+              Math.cos(((0.65 - this.chordHintRemaining) * Math.PI) / 0.16))) /
+            2;
+  }
+
+  resetTransientInput() {
+    clearTimeout(this.longPressTimer);
+    this.touchGesture.cancel();
+    this.pointers.clear();
+    this.pointerState = null;
+    this.chordHintIds.clear();
+    this.chordHintRemaining = 0;
   }
 
   // Show keyboard selection through the same projection used for pointer hit testing.
@@ -709,7 +751,12 @@ export class SurveyScene {
               : isSelected
                 ? PALETTE.hover
                 : PALETTE.closed;
-      this.tiles.setColorAt(cell.id, color);
+      const hint =
+        !cell.revealed && !cell.flagged ? this.chordHintStrength(cell.id) : 0;
+      this.tiles.setColorAt(
+        cell.id,
+        hint ? this.hintColor.copy(color).lerp(PALETTE.hint, hint) : color,
+      );
       this.dummy.position.set(p.x, level + 0.029, p.z);
       this.dummy.rotation.set(-Math.PI / 2, 0, 0);
       this.dummy.scale.setScalar(cell.revealed ? 0 : 1);
@@ -886,14 +933,24 @@ export class SurveyScene {
     });
     canvas.addEventListener("pointerdown", (event) => {
       this.clearFocus();
+      const id = this.pick(event);
+      const cell = this.snapshot?.cells[id];
+      this.touchGesture.start(
+        event,
+        id,
+        this.snapshot?.status === "playing" &&
+          cell?.revealed &&
+          !cell.mine &&
+          cell.adjacent > 0,
+      );
       this.pointers.add(event.pointerId);
       if (this.pointers.size > 1) {
         if (this.pointerState) this.pointerState.cancelled = true;
         clearTimeout(this.longPressTimer);
         return;
       }
-      const id = this.pick(event);
       this.pointerState = {
+        pointerId: event.pointerId,
         x: event.clientX,
         y: event.clientY,
         id,
@@ -905,12 +962,14 @@ export class SurveyScene {
         this.longPressTimer = setTimeout(() => {
           if (this.pointerState && !this.pointerState.cancelled) {
             this.pointerState.consumed = true;
+            this.touchGesture.consume();
             this.callbacks.onFlag(id);
           }
         }, 480);
       }
     });
     canvas.addEventListener("pointermove", (event) => {
+      this.touchGesture.move(event);
       if (
         this.pointerState &&
         Math.hypot(
@@ -939,6 +998,7 @@ export class SurveyScene {
     });
     canvas.addEventListener("pointerup", (event) => {
       const state = this.pointerState;
+      const touchTap = this.touchGesture.finish(event, this.pick(event));
       if (event.pointerType !== "mouse") {
         this.hoverId = -1;
         this.focusId = -1;
@@ -949,30 +1009,54 @@ export class SurveyScene {
       if (this.pointers.size === 0) this.pointerState = null;
       if (state?.cancelled)
         this.suppressDoubleClickUntil = performance.now() + 450;
-      if (!state || state.cancelled || state.consumed || state.id < 0) return;
+      if (
+        !state ||
+        state.cancelled ||
+        state.consumed ||
+        state.id < 0 ||
+        state.pointerId !== event.pointerId
+      ) {
+        this.touchGesture.consume();
+        return;
+      }
       if (Math.hypot(event.clientX - state.x, event.clientY - state.y) > 6)
         return;
+      if (event.pointerType === "touch") {
+        if (!touchTap) return;
+        if (touchTap.chord) {
+          this.callbacks.onChord(state.id);
+          return;
+        }
+      }
       if (event.button === 2 || this.mode === "flag")
         this.callbacks.onFlag(state.id);
       else if (event.button === 0) this.callbacks.onReveal(state.id);
     });
     canvas.addEventListener("pointercancel", () => this.cancelPointerInput());
+    canvas.addEventListener("lostpointercapture", (event) => {
+      if (this.pointers.has(event.pointerId)) this.cancelPointerInput();
+    });
     canvas.addEventListener("dblclick", (event) => {
+      if (this.touchGesture.ignoresNativeDoubleClick(event)) return;
       if (performance.now() < (this.suppressDoubleClickUntil || 0)) return;
       const id = this.pick(event);
       if (id >= 0) this.callbacks.onChord(id);
     });
     this.controls.addEventListener("change", () => this.updateLabels());
     this.controls.addEventListener("cancel", () => this.cancelPointerInput());
+    this.onInputBlur = () => this.cancelPointerInput();
+    window.addEventListener("blur", this.onInputBlur);
   }
 
   // 控件与棋盘共用取消路径，避免失焦或丢失捕获后继续触发长按标记。
   cancelPointerInput() {
+    this.touchGesture.cancel();
     clearTimeout(this.longPressTimer);
     this.pointers.clear();
     this.pointerState = null;
     this.hoverId = -1;
     this.focusId = -1;
+    this.clearChordHint();
     if (!this.disposed) {
       this.drawTiles();
       this.callbacks.onHover(-1);
@@ -1000,6 +1084,11 @@ export class SurveyScene {
       this.callbacks.onFireworksStop?.();
     this.advanceDetonation(elapsed);
     let changing = false;
+    if (this.chordHintRemaining > 0) {
+      this.chordHintRemaining = Math.max(0, this.chordHintRemaining - elapsed);
+      if (this.chordHintRemaining === 0) this.chordHintIds.clear();
+      changing = true;
+    }
     for (let i = 0; i < this.motions.length; i++) {
       if (this.motions[i] < 1) {
         this.motions[i] = Math.min(1, this.motions[i] + delta * 3.8);
@@ -1039,9 +1128,11 @@ export class SurveyScene {
 
   dispose() {
     this.disposed = true;
+    this.resetTransientInput();
     cancelAnimationFrame(this.frame);
     clearTimeout(this.longPressTimer);
     document.removeEventListener("visibilitychange", this.onVisibility);
+    window.removeEventListener("blur", this.onInputBlur);
     this.resizeObserver.disconnect();
     this.controls.dispose();
     this.cosmos.dispose();

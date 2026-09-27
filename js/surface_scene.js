@@ -18,6 +18,7 @@ const COLORS = {
   edge: new THREE.Color("#987756"),
   openEdge: new THREE.Color("#9b7760"),
   side: new THREE.Color("#553c2e"),
+  hint: new THREE.Color("#ffe0a5"),
 };
 
 /**
@@ -43,6 +44,7 @@ export class SurfaceScene extends SurveyScene {
   }
 
   rebuild(snapshot) {
+    this.resetTransientInput();
     if (snapshot.topology?.kind !== "surface")
       throw new TypeError("SurfaceScene requires a surface topology");
     this.detonation.reset();
@@ -374,6 +376,8 @@ export class SurfaceScene extends SurveyScene {
       faceColor.multiplyScalar(
         0.97 + hash(cell.id + (Number(this.topology.seed) || 1)) * 0.06,
       );
+      if (!cell.revealed && !cell.flagged)
+        faceColor.lerp(COLORS.hint, this.chordHintStrength(cell.id));
       const revealed = Number(cell.revealed);
       const needsGeometry = this.drawnReveals[cell.id] !== revealed;
       for (let i = range.start; i < range.start + range.count; i++) {

@@ -4,6 +4,7 @@ import { SurveyAudio } from "./survey_audio.js";
 import { SurfaceScene } from "./surface_scene.js";
 import { createSurface } from "./surface_topology.js";
 import { createI18n } from "./i18n.js";
+import { TouchChordGesture, chordHintIds } from "./touch_chord.js";
 
 const PRESETS = {
   beginner: { width: 9, height: 9, mines: 10 },
@@ -38,8 +39,15 @@ let fallback = false;
 let pendingConfirmation = null;
 let toastTimer;
 let cellButtons = [];
+const accessibleTouch = new TouchChordGesture();
+let accessibleTouchBound = false;
+let accessibleLongPress;
+let chordHintTimer;
+let hintedButtons = [];
 
 function startGame(nextConfig = config) {
+  clearChordFeedback();
+  cancelAccessibleTouch();
   audio.reset();
   config = { ...nextConfig };
   model = new Minefield(
@@ -93,6 +101,21 @@ function syncWorldControls() {
     "title",
   );
   message("field-title", surface ? "game.field.surface" : "game.field.plane");
+  message(
+    "mobile-field-name",
+    surface ? "game.field.surface" : "game.field.plane",
+  );
+  message(
+    "mobile-field-summary",
+    surface ? "game.mobile.surface_summary" : "game.mobile.plane_summary",
+    surface
+      ? {
+          depth: Math.round(topology.irregularity * 100),
+          count: topology.cellCount,
+        }
+      : { width: model.width, height: model.height },
+  );
+  updateDraftNotice();
   message("field-hint", surface ? "game.hint.surface" : "game.hint.orbit");
   const heading = document.querySelector(".mission-intro h1");
   const first = document.createTextNode("");
@@ -201,6 +224,35 @@ function updateSurfaceDraft() {
     "aria-valuetext",
   );
   message("surface-draft-note", "game.draft.apply");
+  updateDraftNotice();
+}
+
+// 概要显示已应用参数；未应用草稿单独提示，收起设置不会丢弃草稿。
+function updateDraftNotice() {
+  const topology = model?.topology;
+  const draft = surfaceDraft();
+  $("surface-draft-note").hidden =
+    !topology ||
+    (draft.shape === topology.shape &&
+      draft.resolution === topology.resolution &&
+      draft.irregularity === topology.irregularity &&
+      Math.floor((6 * draft.resolution ** 2 * draft.density) / 100) ===
+        model.mines);
+}
+
+function setSettingsOpen(open, focus = false) {
+  $("settings-panel").hidden = !open;
+  for (const id of ["settings-btn", "mobile-settings-toggle"])
+    $(id).setAttribute("aria-expanded", String(open));
+  message(
+    $("mobile-settings-toggle").querySelector(".settings-toggle-label"),
+    open ? "ui.close_settings" : "ui.configure",
+  );
+  if (focus && open) $("board-mode").focus();
+}
+
+function toggleSettings() {
+  setSettingsOpen($("settings-panel").hidden, true);
 }
 
 function generateSurfaceConfig() {
@@ -221,6 +273,13 @@ function act(action, id) {
     toast("game.mark_guard");
     return;
   }
+  if (action === "chord") {
+    const ids = chordHintIds(model, id);
+    if (ids.length) {
+      flashChordFeedback(ids);
+      return;
+    }
+  }
   const before = model.status;
   const result =
     action === "flag"
@@ -229,6 +288,7 @@ function act(action, id) {
         ? model.chord(id)
         : model.reveal(id);
   if (result.action === "noop") return;
+  clearChordFeedback();
   if (before === "ready") {
     startedAt = performance.now();
     if (model.topology) $("surface-generator").open = false;
@@ -299,6 +359,7 @@ function showResult() {
 }
 
 function setMode(next) {
+  if (mode !== next) cancelAccessibleTouch();
   mode = next;
   scene?.setMode(mode);
   $("reveal-mode").setAttribute("aria-pressed", String(mode === "reveal"));
@@ -343,6 +404,7 @@ function cellDescription(cell, readout = false) {
 
 function buildAccessibleBoard() {
   const board = $("board-accessibility");
+  if (!accessibleTouchBound) bindAccessibleTouch(board);
   board.innerHTML = "";
   board.setAttribute("role", "grid");
   message(
@@ -380,18 +442,110 @@ function buildAccessibleBoard() {
       button.setAttribute("aria-rowindex", String(y + 1));
       button.setAttribute("aria-colindex", String(x + 1));
       button.tabIndex = id === focusId ? 0 : -1;
-      button.addEventListener("click", () => act(mode, id));
+      button.addEventListener("click", (event) => {
+        // 触屏由 pointerup 执行，拦截随后浏览器合成的 click，键盘激活仍然有效。
+        if (event.detail > 0 && accessibleTouch.ignoresNativeDoubleClick(event))
+          return;
+        act(mode, id);
+      });
       button.addEventListener("contextmenu", (event) => {
         event.preventDefault();
+        if (accessibleTouch.ignoresNativeDoubleClick(event)) return;
         act("flag", id);
       });
-      button.addEventListener("dblclick", () => act("chord", id));
+      button.addEventListener("dblclick", (event) => {
+        if (!accessibleTouch.ignoresNativeDoubleClick(event)) act("chord", id);
+      });
       button.addEventListener("focus", () => selectCell(id, false));
       cellButtons.push(button);
       row.appendChild(button);
     }
     board.appendChild(row);
   }
+}
+
+// 共用同一提示集合；3D 改变格面颜色，兼容棋盘使用不影响布局的状态属性。
+function flashChordFeedback(ids) {
+  clearChordFeedback();
+  scene?.flashChordHint(ids);
+  hintedButtons = ids.map((id) => cellButtons[id]).filter(Boolean);
+  for (const button of hintedButtons) button.dataset.chordHint = "true";
+  chordHintTimer = setTimeout(clearChordFeedback, 650);
+}
+
+function clearChordFeedback() {
+  clearTimeout(chordHintTimer);
+  for (const button of hintedButtons) delete button.dataset.chordHint;
+  hintedButtons = [];
+  scene?.clearChordHint();
+}
+
+function cancelAccessibleTouch() {
+  clearTimeout(accessibleLongPress);
+  const pointers = [...accessibleTouch.pointers];
+  accessibleTouch.cancel();
+  const board = $("board-accessibility");
+  for (const id of pointers)
+    if (board.hasPointerCapture?.(id)) board.releasePointerCapture(id);
+}
+
+function bindAccessibleTouch(board) {
+  accessibleTouchBound = true;
+  board.addEventListener("contextmenu", (event) => event.preventDefault());
+  const targetId = (element) => {
+    const button = element?.closest?.("[data-cell-id]");
+    return button && board.contains(button)
+      ? Number(button.dataset.cellId)
+      : -1;
+  };
+  board.addEventListener("pointerdown", (event) => {
+    const id = targetId(event.target);
+    const cell = model?.cells[id];
+    accessibleTouch.start(
+      event,
+      id,
+      model?.status === "playing" &&
+        cell?.revealed &&
+        !cell.mine &&
+        cell.adjacent > 0,
+    );
+    clearTimeout(accessibleLongPress);
+    if (event.pointerType !== "touch") return;
+    board.setPointerCapture(event.pointerId);
+    const state = accessibleTouch.state;
+    if (!state || state.cancelled || id < 0) return;
+    accessibleLongPress = setTimeout(() => {
+      if (accessibleTouch.state !== state || state.cancelled) return;
+      accessibleTouch.consume();
+      act("flag", id);
+    }, 480);
+  });
+  board.addEventListener("pointermove", (event) => {
+    accessibleTouch.move(event);
+    if (accessibleTouch.state?.cancelled) clearTimeout(accessibleLongPress);
+  });
+  board.addEventListener("pointerup", (event) => {
+    if (event.pointerType !== "touch") return;
+    clearTimeout(accessibleLongPress);
+    const id = targetId(
+      document.elementFromPoint(event.clientX, event.clientY),
+    );
+    const tap = accessibleTouch.finish(event, id);
+    if (board.hasPointerCapture(event.pointerId))
+      board.releasePointerCapture(event.pointerId);
+    if (tap) act(tap.chord ? "chord" : mode, tap.id);
+  });
+  board.addEventListener("pointercancel", cancelAccessibleTouch);
+  board.addEventListener("lostpointercapture", (event) => {
+    if (accessibleTouch.pointers.has(event.pointerId)) cancelAccessibleTouch();
+  });
+  window.addEventListener("blur", cancelAccessibleTouch);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      cancelAccessibleTouch();
+      clearChordFeedback();
+    }
+  });
 }
 
 function updateAccessibleBoard(changed = model.cells.map((cell) => cell.id)) {
@@ -682,12 +836,8 @@ $("confirm-dialog").addEventListener("cancel", (event) => {
   event.preventDefault();
   finishConfirmation(false);
 });
-$("settings-btn").addEventListener("click", () => {
-  const panel = $("settings-panel");
-  panel.hidden = !panel.hidden;
-  $("settings-btn").setAttribute("aria-expanded", String(!panel.hidden));
-  if (!panel.hidden) $("board-mode").focus();
-});
+$("settings-btn").addEventListener("click", toggleSettings);
+$("mobile-settings-toggle").addEventListener("click", toggleSettings);
 $("preset-select").addEventListener("change", async () => {
   const nextPreset = $("preset-select").value;
   $("custom-inputs").hidden = nextPreset !== "custom";
@@ -758,9 +908,19 @@ $("surface-generate").addEventListener("click", async () => {
     surfaceConfig = next;
     startGame(surfaceConfig);
     message("surface-draft-note", "game.draft.ready");
-    if (matchMedia("(max-width: 760px)").matches)
+    if (matchMedia("(max-width: 760px)").matches) {
       $("surface-generator").open = false;
+      const wasOpen = !$("settings-panel").hidden;
+      setSettingsOpen(false);
+      if (wasOpen) {
+        $("reveal-mode").focus({ preventScroll: true });
+        document
+          .querySelector(".scene-section")
+          .scrollIntoView({ block: "start" });
+      }
+    }
   } catch (error) {
+    setSettingsOpen(true);
     showError("surface-error", error);
   }
 });
@@ -844,6 +1004,14 @@ surfaceConfig = generateSurfaceConfig();
 startGame(surfaceConfig);
 message("surface-draft-note", "game.draft.initial");
 mountScene();
+const mobileLayout = matchMedia("(max-width: 760px)");
+setSettingsOpen(!mobileLayout.matches);
+mobileLayout.addEventListener("change", (event) => {
+  const focusInSettings = $("settings-panel").contains(document.activeElement);
+  setSettingsOpen(!event.matches);
+  if (event.matches && focusInSettings)
+    $("mobile-settings-toggle").focus({ preventScroll: true });
+});
 
 setInterval(() => {
   if (model.status === "playing")

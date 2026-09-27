@@ -25,12 +25,16 @@ Choose **English** or **中文** from the language selector. The first visit use
 | Action           | Input                                                                                                                       |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Explore (reveal) | Left-click or tap a hatch. The first reveal and all its neighbors are safe.                                                 |
-| Mark (flag)      | Right-click, select Mark mode in the bottom toolbar, or long-press on a touchscreen.                                        |
-| Chord            | Double-click a revealed number to open its remaining neighbors when the adjacent flag count matches.                        |
+| Mark (flag)      | Right-click, select Mark mode in the toolbar above the board, or long-press on a touchscreen.                               |
+| Chord            | Double-click or double-tap a revealed number to open remaining neighbors when the adjacent flag count matches.              |
 | Orbit            | Drag the scene. Top-down view locks rotation on planar boards; faceted solids allow continuous rotation through both poles. |
 | Zoom and pan     | Scroll or pinch to zoom. Middle-drag or drag with two fingers to pan on planar boards; two fingers orbit faceted solids.    |
 | Keyboard         | Tab into the board, use the arrow keys to select a cell, press Enter or Space to reveal, and F to flag.                     |
 | View and restart | Press V for top-down view or R to restart. Restarting an active round requires confirmation.                                |
+
+On phones, **Explore**, **Mark**, **Generate cube**, and **Restart** are available above the board without scrolling. Detailed parameters start collapsed: tap the field summary or the settings icon to adjust them. The summary shows the applied settings; unapplied changes have a separate notice.
+
+If a number has too few or too many adjacent marks, double-clicking or double-tapping briefly highlights only its covered, unmarked neighbors. Matching the number with incorrect marks still opens those neighbors and can trigger a mine. Dragging, long-pressing, and multi-finger gestures do not count as a double tap.
 
 In **Planar ruin**, choose Scout (beginner: 9 × 9, 10 mines), Deep (intermediate: 16 × 16, 40 mines), or Frontier (expert: 30 × 16, 99 mines). Custom boards support widths of 5–50, heights of 5–30, and 1 to width × height − 9 mines.
 
@@ -46,7 +50,7 @@ Open **More settings** for the remaining parameters:
 - **Tile count** selects 96–864 playable tiles. Each tile has an area of one square unit, so this changes the actual area without stretching individual squares.
 - **Core density** sets the proportion of mines from 8% to 25%; the default is 14%, or 30 cores across 216 tiles.
 
-**Generate cube** applies the draft settings with a new shape seed. The button remains available when More settings is collapsed. Changes stay separate from the current field until applied; replacing an active survey requires confirmation. **New survey** keeps the shape and starts a fresh mine layout.
+**Generate cube** applies the draft settings with a new shape seed. The button stays above the board beside Restart, including when the settings panel is collapsed. Changes stay separate from the current field until applied; replacing an active survey requires confirmation. **Restart**, above the board, keeps the shape and starts a fresh mine layout.
 
 Tiles sharing an edge or corner are neighbors, including across convex ridges and recessed corners. The number of neighbors can vary at those corners. Hovering or keyboard-focusing a tile highlights its actual neighborhood. Numbers, first-move protection, flood reveal, and chording all use these same connections. Shape changes can alter the adjacency graph, so they are only applied when generating a new field.
 
@@ -54,7 +58,7 @@ Arrow keys follow adjacent tiles in the current viewing direction, and keyboard 
 
 The generator cuts whole blocks from corners of a cubic volume to create one closed orthogonal body. A solid center keeps the body connected without tunnels or touching cutouts. The cuts preserve surface area, and all exposed faces are tiled with equal squares. If WebGL becomes unavailable, the same game continues in a six-direction atlas with the original cross-face adjacency and accessible neighbor labels. The atlas groups tiles by the direction they face, including separate terraces at different depths.
 
-**More settings** starts collapsed on every screen and collapses again after the first reveal. Recess depth and Generate cube stay available whenever the settings panel is open. The field name and drag hint remain visible above the board even when settings are hidden.
+**More settings** starts collapsed on every screen and collapses again after the first reveal. Recess depth is the first control when opening settings. On phones, generating a field closes the parameter panel and returns to the play controls; the field summary and gesture hints remain available.
 
 ### Effects and audio
 
@@ -82,6 +86,8 @@ npm run test:i18n
 npm run test:i18n:browser
 # Start the static server on port 8765 in another terminal before browser tests.
 npm run test:browser
+npm run test:mobile
+npm run test:touch
 npm run test:polish
 npm run test:timing
 npm run test:flames
@@ -102,6 +108,7 @@ After editing `js/`, run `npm run build` and refresh the page. The browser loads
 - `js/explorer.js`: Input, timing, difficulty, game status, and compatibility mode.
 - `js/i18n.js`, `js/locales/`: English and Simplified Chinese interface messages, parameter interpolation, and persisted language selection.
 - `js/game_engine.js`: Independent Minesweeper state engine.
+- `js/touch_chord.js`: Shared touch double-tap recognition and neighbor-hint selection for 3D and compatibility views.
 - `js/surface_topology.js`: Deterministic carved solids with unit-square tiles, shared-corner adjacency, and independently controlled tile count and recess depth.
 - `js/surface_scene.js`: Equal square plates, face-aligned numbers, full-object orbiting, occlusion-aware picking, neighbor highlighting, and face-oriented mines and flame jets.
 - `js/free_orbit_controls.js`: Continuous quaternion-based rotation for closed 3D fields, with mouse and touch input, pinch zoom, and gesture cancellation.

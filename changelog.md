@@ -16,6 +16,8 @@
 
 ### Changed
 
+- Group Generate cube and Restart above the board with 48-pixel touch targets, and place Explore/Mark directly above the scene. Mobile settings start collapsed behind an applied-parameter summary so controls and the complete board fit the first screen, including 375 × 667 displays.
+- Keep unapplied parameter changes separate from the active-field summary and return to the play controls after mobile generation.
 - Start directly in Carved cube with 75% recess depth, 216 tiles, and 30 cores; Planar ruin remains available from the field selector.
 - Keep Recess depth and Generate cube visible outside More settings, and identify the active field above the board on desktop and mobile.
 - Enlarged apparent celestial diameters by 40%, scaling Saturn rings and the solar corona with their bodies and leaving more space around Jupiter in the initial mobile view.
@@ -25,6 +27,7 @@
 
 ### Fixed
 
+- Recognize real touchscreen double taps on revealed numbers in both field types and the compatibility grid. Matching flags open remaining neighbors, incorrect matching flags still trigger a loss, and mismatched counts briefly highlight only covered, unmarked neighbors. Cancelled gestures, dragging, long presses, and multi-touch cannot accidentally chord.
 - Remove polar-angle stops from faceted-solid fields, allowing continuous free rotation and vertical flips with mouse or touch while preserving zoom, marking, and upright camera reset.
 - Cancel pending long-press input when a faceted-solid gesture loses pointer capture or window focus.
 - Circular celestial silhouettes at every viewing angle and viewport size, correcting Jupiter's previous off-axis perspective stretching while preserving fixed world bearings.
